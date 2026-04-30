@@ -43,7 +43,7 @@
 | **Web** | Use a framework (FE/BE) | Major | 2 | React 및 NestJS 프레임워크 사용 |
 | **Web** | Real-time features | Major | 2 | WebSockets 기반 실시간 동기화 |
 | **Web** | User Interaction | Major | 2 | 채팅, 프로필, 친구 시스템 구현 |
-| **Gaming** | Web-based game | Major | 2 | 실시간 웹 기반 Pong 게임 |
+| **Gaming** | Web-based game | Major | 2 | 실시간 웹 기반  게임 |
 | **Gaming** | Remote players | Major | 2 | 원격 사용자 간의 온라인 대전 |
 | **AI** | AI Opponent | Major | 2 | 인간의 행동을 시뮬레이션하는 AI 대전 |
 | **DevOps** | Monitoring System | Major | 2 | Prometheus & Grafana 대시보드 |
