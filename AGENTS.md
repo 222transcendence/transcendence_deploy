@@ -129,7 +129,7 @@
 
 ### 프로젝트 구조
 ```
-/home/kyou/trans/
+./
 ├── README.md                      # 최종 평가 문서
 ├── AI_USAGE.md                    # AI 사용 내역 기록
 ├── .env.example                   # 환경 변수 예시
