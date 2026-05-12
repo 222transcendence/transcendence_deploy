@@ -59,26 +59,19 @@ If the user asks for a role-specific plan, provide it in a way that can be copie
 ## PM Master Scheduling Checklist (Commit-Traceable)
 Use this when the user asks for project-wide scheduling, milestone tracking, or release readiness.
 
-### Rule of Completion
-- A checklist item is complete only when all three are present:
-	1. Implementation evidence (code/config/docs)
-	2. Validation evidence (run result, test result, demo proof)
-	3. Commit evidence (at least one matching commit)
-- If commit evidence is missing, treat the item as In Progress.
+`CHECKLIST.md` is the single source of truth for:
+- phase definitions and schedule
+- checklist item IDs such as `P1-01`, `P2-03`
+- completion criteria and release-readiness tracking
+- commit-traceable mapping between work items and git history
 
-### Commit Mapping Rule
-- Every checklist item must have a stable ID: P1-01, P2-03, etc.
-- Every related commit message should include the same ID.
-- Recommended commit message format:
-	- feat(scope): short summary [P2-01]
-	- fix(scope): short summary [P3-02]
-	- docs(scope): short summary [P4-01]
+In this agent file, do not duplicate the full checklist. Instead:
+- refer to `CHECKLIST.md` for the current checklist contents
+- summarize only the relevant phase or items needed for the user's request
+- preserve checklist IDs exactly as written in `CHECKLIST.md`
+- treat items without implementation, validation, and commit evidence as not complete
 
-### Phase Checklist (PM)
-
-#### Phase 1: Foundation and Environment (Week 1-2)
-- [ ] P1-01 Repository and team access setup
-- [ ] P1-02 .env.example to .env bootstrapping flow documented
+If the user asks for milestone status, planning, or release readiness, read `CHECKLIST.md` first and base the response on that file rather than a copied checklist here.
 - [ ] P1-03 docker-compose up --build works from clean state
 - [ ] P1-04 HTTPS endpoint reachable at https://localhost
 - [ ] P1-05 Base frontend/backend service health checks verified
