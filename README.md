@@ -1,15 +1,15 @@
-# Beyond Pong: Transcendence
+# Transcendence: Tactical Card Duel
 
 *This project has been created as part of the 42 curriculum by [login1], [login2], [login3], [login4], [login5].*
 
 ## 1. Description
-**Beyond Pong**은 고전적인 Pong 게임을 현대적인 웹 기술로 재해석한 실시간 멀티플레이어 플랫폼입니다. 실시간 웹소켓 통신, 지능형 AI 대전, 그리고 견고한 데브옵스 모니터링 시스템을 갖춘 종합 웹 서비스를 제공합니다.
+**Transcendence**는 TCG '언라이트'를 레퍼런스로 한 턴제 덱 기반 듀얼(TCG Duel) 게임입니다. 플레이어는 전사·마법사·도적 중 한 직업의 덱을 구성하여, 드로우·이동·공격·방어의 페이즈를 통해 전략적 전투를 진행합니다. 카드 제출, 주사위 판정, 상태이상 시스템을 활용해 전투를 운영하며, 턴 제한과 판정승 규칙 등으로 승패가 결정됩니다.
 
 ### Key Features
-- **Real-time Gameplay**: WebSockets을 통한 저지연 멀티플레이어 환경.
-- **Remote Matchmaking**: 별도 기기의 사용자 간 실시간 원격 대전.
-- **AI Opponent**: 인간의 플레이를 시뮬레이션하는 지능형 AI 알고리즘.
-- **Social Interaction**: 실시간 채팅 및 친구 시스템을 통한 사용자 간 상호작용.
+- **Turn-based Duel System**: 드로우·이동·공격·방어 페이즈로 구성된 턴제 카드 전투.
+- **Deck & Card Mechanics**: 덱 구성, 액션 카드(이동/방어/근·중·원거리 공격/특수)와 슬롯 관리.
+- **AI Opponent**: 카드 기반 전략을 수행하는 AI 대전.
+- **Social Interaction**: 채팅 및 친구 시스템을 통한 사용자 상호작용.
 - **DevOps Monitoring**: Prometheus와 Grafana를 이용한 시스템 상태 시각화.
 
 ---
@@ -43,7 +43,7 @@
 | **Web** | Use a framework (FE/BE) | Major | 2 | React 및 NestJS 프레임워크 사용 |
 | **Web** | Real-time features | Major | 2 | WebSockets 기반 실시간 동기화 |
 | **Web** | User Interaction | Major | 2 | 채팅, 프로필, 친구 시스템 구현 |
-| **Gaming** | Web-based game | Major | 2 | 실시간 웹 기반 Pong 게임 |
+| **Gaming** | Web-based game | Major | 2 | 실시간 웹 기반  게임 |
 | **Gaming** | Remote players | Major | 2 | 원격 사용자 간의 온라인 대전 |
 | **AI** | AI Opponent | Major | 2 | 인간의 행동을 시뮬레이션하는 AI 대전 |
 | **DevOps** | Monitoring System | Major | 2 | Prometheus & Grafana 대시보드 |
