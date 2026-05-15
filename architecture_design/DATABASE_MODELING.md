@@ -1,0 +1,65 @@
+# Professional Database Modeling (PostgreSQL Optimized)
+
+## 1. Advanced ER Diagram
+\`\`\`mermaid
+erDiagram
+    USER ||--o{ AUTH_PROFILE : profile_of
+    USER ||--o{ MATCH_HISTORY : participates
+    USER ||--o{ FRIENDSHIP : relates
+    MATCH_HISTORY ||--o{ MATCH_ACTION_LOG : records
+
+    USER {
+        bigint id PK
+        string username "UNIQUE, INDEX"
+        string password_hash
+        boolean is_2fa_enabled
+        int global_elo "Default: 1000"
+    }
+
+    AUTH_PROFILE {
+        bigint id PK
+        int user_id FK
+        string oauth_42_id "NULLABLE"
+        string avatar_url
+        string tfa_secret "ENCRYPTED"
+    }
+
+    MATCH_HISTORY {
+        bigint id PK
+        int host_id FK
+        int guest_id FK
+        int winner_id FK
+        enum match_type "RANKED, NORMAL"
+        int elo_change
+        timestamp started_at
+        timestamp ended_at
+    }
+
+    MATCH_ACTION_LOG {
+        bigint id PK
+        int match_id FK
+        int turn_number
+        enum phase "MOVE, ATTACK, DEFENSE"
+        jsonb action_data "Optimized JSON storage"
+    }
+
+    FRIENDSHIP {
+        int user_a_id FK
+        int user_b_id FK
+        enum status "PENDING, ACCEPTED, BLOCKED"
+        timestamp updated_at
+    }
+\`\`\`
+
+## 2. Implementation Strategies
+### 2.1. Concurrency Control
+- **Optimistic Locking**: 게임 결과 기록 시 \`version\` 필드를 활용하여 데이터 충돌 방지.
+- **Transactions**: 매치 종료 시 승리자 보상 및 랭킹 업데이트는 단일 트랜잭션 내에서 처리 (Atomicity 보장).
+
+### 2.2. Storage Optimization
+- **JSONB Usage**: \`MATCH_ACTION_LOG\`에서 \`jsonb\` 타입을 사용하여 필드 내 데이터에 대한 인덱싱 가능.
+- **Partitioning**: \`MATCH_ACTION_LOG\`가 거대해질 경우 \`match_id\` 혹은 날짜별 파티셔닝 적용 고려.
+
+## 3. Security
+- **Data at Rest**: 민감 정보(2FA Secret 등)는 애플리케이션 레벨에서 암호화 후 저장.
+- **GDPR Compliance**: 유저 탈퇴 시 식별 정보(username 등) 비식별화 처리 프로세스 수립.
