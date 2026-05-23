@@ -1,6 +1,6 @@
 # Transcendence: Tactical Card Duel
 
-*This project has been created as part of the 42 curriculum by [login1], [login2], [login3], [login4], [login5].*
+*This project has been created as part of the 42 curriculum by hisong, jahong, jishin, kyouhele, yuhyoon.*
 
 ## 1. Description
 **Transcendence**는 TCG '언라이트'를 레퍼런스로 한 턴제 덱 기반 듀얼(TCG Duel) 게임입니다. 플레이어는 전사·마법사·도적 중 한 직업의 덱을 구성하여, 드로우·이동·공격·방어의 페이즈를 통해 전략적 전투를 진행합니다. 카드 제출, 주사위 판정, 상태이상 시스템을 활용해 전투를 운영하며, 턴 제한과 판정승 규칙 등으로 승패가 결정됩니다.
