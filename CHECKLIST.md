@@ -19,7 +19,7 @@
 
 | ID | Task | Owner | Status | Implementation Evidence | Validation Evidence | Commit(s) |
 |---|---|---|---|---|---|---|
-| P1-01 | Repository and team access setup |  | TODO |  |  |  |
+| P1-01 | Repository and team access setup | hijae | Done | .gitmodules, README.md | git submodule status & gh api checks | feat(infra): repository setup & branch strategy [P1-01] |
 | P1-02 | .env.example -> .env bootstrapping flow documented |  | TODO |  |  |  |
 | P1-03 | docker-compose up --build works from clean state |  | TODO |  |  |  |
 | P1-04 | HTTPS endpoint reachable at https://localhost |  | TODO |  |  |  |
@@ -71,7 +71,7 @@
 
 | Phase | Done | In Progress | Blocked | TODO |
 |---|---:|---:|---:|---:|
-| Phase 1 | 0 | 0 | 0 | 6 |
+| Phase 1 | 1 | 0 | 0 | 5 |
 | Phase 2 | 0 | 0 | 0 | 6 |
 | Phase 3 | 0 | 0 | 0 | 6 |
 | Phase 4 | 0 | 0 | 0 | 6 |
