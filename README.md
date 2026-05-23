@@ -17,11 +17,11 @@
 ## 2. Team Information
 | Role | Name (Login) | Responsibilities |
 | :--- | :--- | :--- |
-| **Product Owner (PO)** | [login1] | 기능 정의 및 우선순위 관리, 최종 모듈 검증 |
-| **Project Manager (PM)** | [login2] | 스케줄 관리, 데브옵스 모니터링 시스템 구축 |
-| **Technical Lead** | [login3] | 시스템 아키텍처 설계, 실시간 웹소켓 로직 설계 |
-| **Developer** | [login4] | 프론트엔드 UI/UX 및 게임 물리 엔진 구현 |
-| **Developer** | [login5] | 백엔드 API 및 DB ORM 스키마 설계 |
+| **Product Owner (PO)** | yuhyoon | 기능 정의 및 우선순위 관리, 최종 모듈 검증 |
+| **Project Manager (PM)** | kyouhele | 스케줄 관리, 데브옵스 모니터링 시스템 구축 |
+| **Technical Lead** | hisong | 시스템 아키텍처 설계, 실시간 웹소켓 로직 설계 |
+| **Developer** | jahong | 프론트엔드 UI/UX |
+| **Developer** | jishin | 백엔드 API 및 DB ORM 스키마 설계 |
 
 ---
 
