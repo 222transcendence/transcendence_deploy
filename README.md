@@ -1,6 +1,6 @@
 # Transcendence: Tactical Card Duel
 
-*This project has been created as part of the 42 curriculum by [login1], [login2], [login3], [login4], [login5].*
+*This project has been created as part of the 42 curriculum by hisong, jahong, jishin, kyouhele, yuhyoon.*
 
 ## 1. Description
 **Transcendence**는 TCG '언라이트'를 레퍼런스로 한 턴제 덱 기반 듀얼(TCG Duel) 게임입니다. 플레이어는 전사·마법사·도적 중 한 직업의 덱을 구성하여, 드로우·이동·공격·방어의 페이즈를 통해 전략적 전투를 진행합니다. 카드 제출, 주사위 판정, 상태이상 시스템을 활용해 전투를 운영하며, 턴 제한과 판정승 규칙 등으로 승패가 결정됩니다.
@@ -17,11 +17,11 @@
 ## 2. Team Information
 | Role | Name (Login) | Responsibilities |
 | :--- | :--- | :--- |
-| **Product Owner (PO)** | [login1] | 기능 정의 및 우선순위 관리, 최종 모듈 검증 |
-| **Project Manager (PM)** | [login2] | 스케줄 관리, 데브옵스 모니터링 시스템 구축 |
-| **Technical Lead** | [login3] | 시스템 아키텍처 설계, 실시간 웹소켓 로직 설계 |
-| **Developer** | [login4] | 프론트엔드 UI/UX 및 게임 물리 엔진 구현 |
-| **Developer** | [login5] | 백엔드 API 및 DB ORM 스키마 설계 |
+| **Product Owner (PO)** | yuhyoon | 기능 정의 및 우선순위 관리, 최종 모듈 검증 |
+| **Project Manager (PM)** | kyouhele | 스케줄 관리, 데브옵스 모니터링 시스템 구축 |
+| **Technical Lead** | hisong | 시스템 아키텍처 설계, 실시간 웹소켓 로직 설계 |
+| **Developer** | jahong | 프론트엔드 UI/UX |
+| **Developer** | jishin | 백엔드 API 및 DB ORM 스키마 설계 |
 
 ---
 
