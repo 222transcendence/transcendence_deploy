@@ -83,3 +83,29 @@ docker-compose up --build
 ## 7. Resources & AI Usage
 - **Documentation**: NestJS Docs, React Dev, Socket.io Documentation.
 - **AI Usage**: [AI_USAGE.md](./AI_USAGE.md) 파일에 상세 기록되어 있습니다.
+
+---
+
+## 8. Git Flow & Commit Conventions
+
+### Branching Strategy
+본 프로젝트는 **Git Flow** 전략을 기반으로 협업을 진행합니다:
+- **`main`**: 상용 서비스 배포 브랜치. 모든 변경사항은 엄격히 검증되어야 합니다.
+- **`develop`**: 개발 통합 브랜치. 주간/스프린트별로 개발 완료된 기능들이 병합됩니다.
+- **`feature/*`**: 개별 기능 개발 브랜치 (예: `feature/auth`, `feature/game`). `develop` 브랜치로부터 생성되어 작업 완료 후 Pull Request 및 1명 이상의 승인을 거쳐 `develop`에 병합됩니다.
+
+### Commit Message Convention
+모든 커밋 메시지는 협업 규칙을 따르기 위해 다음 형식을 준수합니다:
+```
+<type>(<scope>): <subject> [ID] (옵션)
+```
+- **`feat`**: 새 기능 (모듈, 엔드포인트 추가 등)
+- **`fix`**: 버그 수정
+- **`refactor`**: 코드 구조 개선 (기능 변화 없음)
+- **`docs`**: 문서 추가/수정
+- **`test`**: 테스트 코드 추가/수정
+- **`chore`**: 빌드 설정, 패키지 의존성 관리 등 기타 작업
+
+예시:
+`feat(auth): 회원가입 API 추가 및 bcrypt 해싱 적용 [P2-02]`
+

@@ -1,0 +1,6 @@
+[submodule "transcendence_backend"]
+	path = transcendence_backend
+	url = ../transcendence_backend.git
+[submodule "transcendence_frontend"]
+	path = transcendence_frontend
+	url = ../transcendence_frontend.git
