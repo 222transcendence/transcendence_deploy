@@ -3,25 +3,21 @@
 ## 1. Advanced ER Diagram
 \`\`\`mermaid
 erDiagram
-    USER ||--o{ AUTH_PROFILE : profile_of
     USER ||--o{ MATCH_HISTORY : participates
     USER ||--o{ FRIENDSHIP : relates
     MATCH_HISTORY ||--o{ MATCH_ACTION_LOG : records
 
     USER {
-        bigint id PK
-        string username "UNIQUE, INDEX"
-        string password_hash
-        boolean is_2fa_enabled
-        int global_elo "Default: 1000"
-    }
-
-    AUTH_PROFILE {
-        bigint id PK
-        int user_id FK
-        string oauth_42_id "NULLABLE"
-        string avatar_url
-        string tfa_secret "ENCRYPTED"
+        uuid id PK
+        string email "UNIQUE"
+        string nickname "UNIQUE"
+        string password "NULLABLE"
+        string avatar
+        enum status "ONLINE, OFFLINE, IN_GAME"
+        int wins "Default: 0"
+        int losses "Default: 0"
+        timestamp createdAt
+        timestamp updatedAt
     }
 
     MATCH_HISTORY {
