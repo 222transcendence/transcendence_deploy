@@ -9,7 +9,7 @@
 
 | 항목 | 내용 |
 |---|---|
-| 경로 | `/Users/hijae/Downloads/Battlearenaanddecklobby` |
+| 경로 | `222transcendence/Battlearenaanddecklobby` |
 | 스택 | React 18 · Vite · Tailwind CSS v4 · shadcn/ui · Radix UI · Lucide React |
 | 화면 | **BATTLE** (전투 아레나) / **LOBBY** (덱 빌더) 두 화면 전환 구조 |
 | 특징 | 어두운 SF/판타지 다크 테마, 모노스페이스 폰트 기반 게임 UI |
