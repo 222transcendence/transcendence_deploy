@@ -126,10 +126,10 @@
     - `403`: 권한 없음 (비공개 매치)
     - `404`: 매치 정보 없음
 
-### [POST] /api/v1/match/queue
-    ```json
-    { "deck_id": 101, "match_type": "RANKED" }
-    ```
+#### [POST] /api/v1/match/queue
+```json
+{ "deck_id": 101, "match_type": "RANKED" }
+```
 
 #### Rate Limit Rationale & Client Retry Guidance
 
