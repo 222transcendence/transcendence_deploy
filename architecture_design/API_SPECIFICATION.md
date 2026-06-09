@@ -274,8 +274,102 @@ All endpoints below are prefixed with `/api/chat` and require **JWT Bearer Token
     }
     \`\`\`
 - **Error Codes**:
-    - \`400\`: 유효성 검사 실패 (닉네임 길이 초과 등)
-    - \`409\`: 닉네임 중복 발생 (\`E_CONFLICT\`)
+    - `400`: 유효성 검사 실패 (닉네임 길이 초과 등)
+    - `409`: 닉네임 중복 발생 (`E_CONFLICT`)
+
+### [POST] /api/auth/signup
+- **Description**: 신규 사용자를 등록함.
+- **Request Body**:
+    ```json
+    {
+      "email": "user@example.com",
+      "nickname": "user_nickname",
+      "password": "user_password"
+    }
+    ```
+- **Success Response (201 Created)**:
+    ```json
+    {
+      "timestamp": "2026-06-09T12:00:00Z",
+      "status": 201,
+      "data": {
+        "id": "uuid-string",
+        "email": "user@example.com",
+        "nickname": "user_nickname",
+        "avatar": "default_avatar.png",
+        "status": "OFFLINE",
+        "wins": 0,
+        "losses": 0,
+        "createdAt": "2026-06-09T12:00:00Z",
+        "updatedAt": "2026-06-09T12:00:00Z"
+      },
+      "error": null
+    }
+    ```
+
+### [POST] /api/auth/login
+- **Description**: 사용자 인증을 진행하고 JWT 토큰을 발급함.
+- **Request Body**:
+    ```json
+    {
+      "email": "user@example.com",
+      "password": "user_password"
+    }
+    ```
+- **Success Response (200 OK)**:
+    ```json
+    {
+      "timestamp": "2026-06-09T12:00:00Z",
+      "status": 200,
+      "data": {
+        "accessToken": "jwt-access-token",
+        "refreshToken": "jwt-refresh-token",
+        "user": {
+          "id": "uuid-string",
+          "email": "user@example.com",
+          "nickname": "user_nickname",
+          "avatar": "default_avatar.png",
+          "status": "ONLINE"
+        }
+      },
+      "error": null
+    }
+    ```
+
+### [POST] /api/auth/refresh
+- **Description**: Refresh 토큰으로 Access 토큰을 갱신함.
+- **Request Body**:
+    ```json
+    {
+      "refreshToken": "jwt-refresh-token"
+    }
+    ```
+- **Success Response (200 OK)**:
+    ```json
+    {
+      "timestamp": "2026-06-09T12:00:00Z",
+      "status": 200,
+      "data": {
+        "accessToken": "new-jwt-access-token"
+      },
+      "error": null
+    }
+    ```
+
+### [POST] /api/auth/logout
+- **Description**: 로그아웃을 진행하고 Refresh 토큰을 만료시킴.
+- **Authentication**: JWT 필수
+- **Success Response (200 OK)**:
+    ```json
+    {
+      "timestamp": "2026-06-09T12:00:00Z",
+      "status": 200,
+      "data": {
+        "success": true
+      },
+      "error": null
+    }
+    ```
 
 #### Rate Limit Rationale & Client Retry Guidance
 
