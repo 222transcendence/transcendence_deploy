@@ -14,6 +14,24 @@
 
 ## 2. API Endpoint Details (Highlight)
 
+### [POST] /api/users/me/avatar
+- **Description**: 로그인한 사용자의 아바타 이미지를 업로드하고 프로필에 반영.
+- **Auth**: `Authorization: Bearer <token>` 필수 (JwtAuthGuard).
+- **Request**: `multipart/form-data`, 필드명 `avatar` (단일 파일).
+- **허용 형식**: `image/jpeg`, `image/png`, `image/webp`, 최대 2MB.
+- **저장 방식**: 서버 로컬 디스크 (`uploads/avatars/`), 파일명은 UUID로 재생성. `/uploads` 경로로 정적 서빙됨.
+- **Response**: 비밀번호를 제외한 갱신된 User 객체 (`avatar` 필드에 새 URL 포함).
+- **Error Codes**:
+    - `400`: 파일 누락 또는 허용되지 않은 형식/용량 초과
+    - `401`: 인증 토큰 없음/만료
+
+### [GET] /api/v1/matches/{id}/replay
+- **Description**: 종료된 게임의 모든 액션 로그를 리플레이 형식으로 반환.
+- **Query Params**: \`speed\` (Optional), \`turn_range\` (Optional)
+- **Error Codes**:
+    - \`403\`: 권한 없음 (비공개 매치)
+    - \`404\`: 매치 정보 없음
+
 ### Authentication APIs
 
 #### [POST] /api/auth/signup

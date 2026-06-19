@@ -49,6 +49,8 @@ services:
       FT_CALLBACK_URL: ${FT_CALLBACK_URL}
     ports:
       - "3000:3000"
+    volumes:
+      - backend_uploads:/app/uploads
     depends_on:
       db:
         condition: service_healthy
@@ -109,6 +111,7 @@ services:
 volumes:
   pgdata:
   redisdata:
+  backend_uploads:
 
 networks:
   transcendence_net:
