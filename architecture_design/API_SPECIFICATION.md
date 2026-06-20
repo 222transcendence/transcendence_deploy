@@ -26,6 +26,86 @@
     { "deck_id": 101, "match_type": "RANKED" }
     \`\`\`
 
+### [GET] /api/users/me
+- **Description**: 로그인한 사용자 본인의 전체 프로필 정보를 가져옴. (비밀번호 제외)
+- **Authentication**: JWT 필수
+- **Success Response (200 OK)**:
+    \`\`\`json
+    {
+      "timestamp": "2026-05-29T10:00:00Z",
+      "status": 200,
+      "data": {
+        "id": "uuid-string",
+        "email": "user@example.com",
+        "nickname": "my_nickname",
+        "avatar": "default_avatar.png",
+        "status": "ONLINE",
+        "wins": 10,
+        "losses": 5,
+        "createdAt": "2026-05-29T00:00:00Z",
+        "updatedAt": "2026-05-29T00:00:00Z"
+      },
+      "error": null
+    }
+    \`\`\`
+
+### [GET] /api/users/{id}
+- **Description**: 특정 사용자 ID에 해당하는 타인의 프로필 정보를 가져옴. 민감한 정보(이메일, 비밀번호)는 제외하고 공개 가능한 데이터만 반환함.
+- **Authentication**: JWT 필수
+- **Success Response (200 OK)**:
+    \`\`\`json
+    {
+      "timestamp": "2026-05-29T10:00:00Z",
+      "status": 200,
+      "data": {
+        "id": "uuid-string",
+        "nickname": "target_nickname",
+        "avatar": "default_avatar.png",
+        "status": "ONLINE",
+        "wins": 12,
+        "losses": 8,
+        "createdAt": "2026-05-29T00:00:00Z",
+        "updatedAt": "2026-05-29T00:00:00Z"
+      },
+      "error": null
+    }
+    \`\`\`
+- **Error Codes**:
+    - \`404\`: 존재하지 않는 사용자 ID
+
+### [PATCH] /api/users/me
+- **Description**: 로그인한 본인의 \`nickname\` 또는 \`avatar\`를 수정함. 닉네임 수정 시 중복 검사를 거침.
+- **Authentication**: JWT 필수
+- **Request Body**:
+    \`\`\`json
+    {
+      "nickname": "new_nickname",
+      "avatar": "new_avatar.png"
+    }
+    \`\`\`
+- **Success Response (200 OK)**:
+    \`\`\`json
+    {
+      "timestamp": "2026-05-29T10:00:00Z",
+      "status": 200,
+      "data": {
+        "id": "uuid-string",
+        "email": "user@example.com",
+        "nickname": "new_nickname",
+        "avatar": "new_avatar.png",
+        "status": "ONLINE",
+        "wins": 10,
+        "losses": 5,
+        "createdAt": "2026-05-29T00:00:00Z",
+        "updatedAt": "2026-05-29T00:00:00Z"
+      },
+      "error": null
+    }
+    \`\`\`
+- **Error Codes**:
+    - \`400\`: 유효성 검사 실패 (닉네임 길이 초과 등)
+    - \`409\`: 닉네임 중복 발생 (\`E_CONFLICT\`)
+
 #### Rate Limit Rationale & Client Retry Guidance
 
 - **Rationale**: `1분에 5회` 제한은 매칭 큐에 대한 과도한 재요청(네트워크 장애로 인한 재시도 폭증, 악의적 스팸)을 방지하고, 매칭 서비스의 안정성과 공정성을 확보하기 위해 설정되었습니다. 낮은 빈도로 반복 요청이 몰릴 경우 매칭 정확도와 시스템 처리량에 악영향을 미치므로 기본 제한을 둡니다.
