@@ -10,21 +10,126 @@
   "data": { ... },
   "error": null
 }
-\`\`\`
+```
 
 ## 2. API Endpoint Details (Highlight)
 
-### [GET] /api/v1/matches/{id}/replay
-- **Description**: 종료된 게임의 모든 액션 로그를 리플레이 형식으로 반환.
-- **Query Params**: \`speed\` (Optional), \`turn_range\` (Optional)
-- **Error Codes**:
-    - \`403\`: 권한 없음 (비공개 매치)
-    - \`404\`: 매치 정보 없음
+### Authentication APIs
 
-### [POST] /api/v1/match/queue
-    \`\`\`json
-    { "deck_id": 101, "match_type": "RANKED" }
-    \`\`\`
+#### [POST] /api/auth/signup
+- **Description**: 이메일과 패스워드로 신규 사용자 회원가입을 처리합니다.
+- **Request Body**:
+    ```json
+    {
+      "email": "user@example.com",
+      "nickname": "new_user",
+      "password": "securepassword123"
+    }
+    ```
+- **Response (Success 201)**:
+    ```json
+    {
+      "timestamp": "2026-05-29T14:00:00Z",
+      "status": 201,
+      "data": {
+        "id": "uuid-v4-string",
+        "email": "user@example.com",
+        "nickname": "new_user",
+        "avatar": "default_avatar.png",
+        "status": "OFFLINE",
+        "wins": 0,
+        "losses": 0,
+        "createdAt": "2026-05-29T14:00:00Z",
+        "updatedAt": "2026-05-29T14:00:00Z"
+      },
+      "error": null
+    }
+    ```
+- **Error Codes**:
+    - `400 Bad Request` (E_BAD_REQUEST): 입력 데이터 유효성 검사 실패 (짧은 비밀번호, 이메일 형식 등)
+    - `409 Conflict` (E_CONFLICT): 이미 가입된 이메일 또는 사용 중인 닉네임
+
+#### [POST] /api/auth/login
+- **Description**: 사용자 자격 증명을 검증하고 Access/Refresh Token을 발급합니다.
+- **Request Body**:
+    ```json
+    {
+      "email": "user@example.com",
+      "password": "securepassword123"
+    }
+    ```
+- **Response (Success 200)**:
+    ```json
+    {
+      "timestamp": "2026-05-29T14:00:00Z",
+      "status": 200,
+      "data": {
+        "accessToken": "jwt-access-token-string",
+        "refreshToken": "jwt-refresh-token-string",
+        "user": {
+          "id": "uuid-v4-string",
+          "email": "user@example.com",
+          "nickname": "new_user",
+          "avatar": "default_avatar.png",
+          "status": "ONLINE"
+        }
+      },
+      "error": null
+    }
+    ```
+- **Error Codes**:
+    - `401 Unauthorized` (E1001): 잘못된 비밀번호 또는 가입되지 않은 이메일
+
+#### [POST] /api/auth/refresh
+- **Description**: 만료된 Access Token을 갱신합니다.
+- **Request Body**:
+    ```json
+    {
+      "refreshToken": "jwt-refresh-token-string"
+    }
+    ```
+- **Response (Success 200)**:
+    ```json
+    {
+      "timestamp": "2026-05-29T14:00:00Z",
+      "status": 200,
+      "data": {
+        "accessToken": "new-jwt-access-token-string"
+      },
+      "error": null
+    }
+    ```
+- **Error Codes**:
+    - `401 Unauthorized` (E1001): 유효하지 않거나 탈취된/로그아웃된 Refresh Token
+
+#### [POST] /api/auth/logout
+- **Description**: 로그인 세션을 종료하고 Refresh Token을 무효화합니다 (JWT Bearer Token 필요).
+- **Headers**: `Authorization: Bearer <accessToken>`
+- **Response (Success 200)**:
+    ```json
+    {
+      "timestamp": "2026-05-29T14:00:00Z",
+      "status": 200,
+      "data": {
+        "success": true
+      },
+      "error": null
+    }
+    ```
+
+### Game APIs
+
+#### [GET] /api/v1/matches/{id}/replay
+- **Description**: 종료된 게임의 모든 액션 로그를 리플레이 형식으로 반환.
+- **Query Params**: `speed` (Optional), `turn_range` (Optional)
+- **Error Codes**:
+    - `403`: 권한 없음 (비공개 매치)
+    - `404`: 매치 정보 없음
+
+#### [POST] /api/v1/match/queue
+```json
+{ "deck_id": 101, "match_type": "RANKED" }
+```
 
 ### [GET] /api/users/me
 - **Description**: 로그인한 사용자 본인의 전체 프로필 정보를 가져옴. (비밀번호 제외)
