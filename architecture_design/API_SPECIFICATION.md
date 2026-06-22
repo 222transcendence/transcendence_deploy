@@ -117,7 +117,42 @@
     }
     ```
 
+### Chat APIs
+
+All endpoints below are prefixed with `/api/chat` and require **JWT Bearer Token** (`Authorization: Bearer <accessToken>`).
+
+#### [GET] /api/chat/history
+- **Description**: 최근 채팅 메시지 50개를 시간 순(오래된 것 먼저)으로 반환합니다.
+- **Headers**: `Authorization: Bearer <accessToken>`
+- **Response (Success 200)**:
+    ```json
+    {
+      "timestamp": "2026-06-22T12:00:00Z",
+      "status": 200,
+      "data": [
+        {
+          "id": "uuid-v4-string",
+          "sender": {
+            "id": "uuid-v4-string",
+            "nickname": "alice",
+            "avatar": "avatars/alice.png"
+          },
+          "content": "Hello, World!",
+          "roomId": null,
+          "type": "NORMAL",
+          "createdAt": "2026-06-22T11:59:00Z"
+        }
+      ],
+      "error": null
+    }
+    ```
+- **Message Types**: `NORMAL` (일반 채팅), `INVITE` (게임 초대)
+- **Access**: Private (JWT 필요)
+
+---
+
 ### Game APIs
+
 
 #### [GET] /api/v1/matches/{id}/replay
 - **Description**: 종료된 게임의 모든 액션 로그를 리플레이 형식으로 반환.
