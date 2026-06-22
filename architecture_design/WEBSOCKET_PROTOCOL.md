@@ -1,5 +1,58 @@
 # Game Sync Protocol & WebSocket Sequence (v2)
 
+## 0. Lobby & Room Management Protocol
+`/ws/game/{room_id}` 연결 이전, 로비 화면은 별도 엔드포인트 `/ws/lobby`에 연결하여 방 목록과 입장/대기 상태를 동기화함. 메시지 envelope은 [3. Message Envelope Design](#3-message-envelope-design)과 동일한 `{ type, payload, seq }` 구조를 따름. (Backend Epic #2 미구현 상태이며, 이 절은 FE 작업(P3-09)을 위해 선제적으로 정의한 계약임 — 백엔드 구현 시 본 스펙을 기준으로 삼을 것)
+
+### 0.1. Room Object
+```json
+{
+  "id": "room-uuid",
+  "host": { "userId": "uuid", "nickname": "host_nick", "characterId": "magician", "ready": false },
+  "guest": { "userId": "uuid", "nickname": "guest_nick", "characterId": "knight", "ready": false } | null,
+  "status": "WAITING | IN_GAME",
+  "createdAt": "2026-06-22T10:00:00Z"
+}
+```
+
+### 0.2. Client → Server Messages
+| Type | Payload | Description |
+| :--- | :--- | :--- |
+| `LIST_ROOMS` | `{}` | 현재 방 목록 스냅샷 요청 (연결 시 자동 수신도 됨) |
+| `CREATE_ROOM` | `{ characterId }` | 새 방 생성, 본인이 host가 됨 |
+| `JOIN_ROOM` | `{ roomId, characterId }` | 대기중인 방에 guest로 입장 |
+| `LEAVE_ROOM` | `{ roomId }` | 방 퇴장 (host 퇴장 시 방 폭파) |
+| `SET_READY` | `{ roomId, ready }` | 준비 완료/취소 토글 |
+
+### 0.3. Server → Client Messages
+| Type | Payload | Description |
+| :--- | :--- | :--- |
+| `ROOM_LIST` | `{ rooms: Room[] }` | 전체 방 목록 (연결 시 + 변경 발생 시 broadcast) |
+| `ROOM_UPDATED` | `{ room: Room }` | 특정 방의 상태 변경 (입장/캐릭터 선택/준비 상태) |
+| `ROOM_CLOSED` | `{ roomId }` | 방 삭제 (host 퇴장 등) |
+| `GAME_START` | `{ roomId }` | host/guest 모두 ready 시 발송, 클라이언트는 `/ws/game/{roomId}`로 전환 |
+| `ACTION_REJECTED` | `{ message }` | 잘못된 요청(예: 이미 가득 찬 방 입장 시도) |
+
+### 0.4. Sequence
+```mermaid
+sequenceDiagram
+    participant C1 as Client A (Host)
+    participant C2 as Client B (Guest)
+    participant S as Server (Lobby)
+
+    C1->>S: CONNECT /ws/lobby
+    S->>C1: ROOM_LIST
+    C1->>S: CREATE_ROOM (characterId)
+    S->>C1: ROOM_UPDATED (room, host set)
+    S-->>C2: ROOM_LIST (broadcast)
+    C2->>S: JOIN_ROOM (roomId, characterId)
+    S->>C1: ROOM_UPDATED (guest joined)
+    S->>C2: ROOM_UPDATED (guest joined)
+    C1->>S: SET_READY (true)
+    C2->>S: SET_READY (true)
+    S->>C1: GAME_START (roomId)
+    S->>C2: GAME_START (roomId)
+```
+
 ## 1. Game Start Sequence
 서버와 클라이언트 간의 초기 연결 및 동기화 프로세스입니다.
 
