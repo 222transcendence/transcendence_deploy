@@ -117,6 +117,37 @@
     }
     ```
 
+#### [GET] /api/auth/42
+- **Description**: 42 OAuth 2.0 인증 페이지로 리디렉트합니다.
+- **Auth**: 없음 (public)
+- **Response**: 302 Redirect → `https://api.intra.42.fr/oauth/authorize?...`
+
+#### [GET] /api/auth/42/callback
+- **Description**: 42 OAuth 콜백 엔드포인트. 인증 성공 시 JWT 토큰을 발급합니다.
+- **Auth**: 없음 (public, passport-42 처리)
+- **Query Params**: `code` (42 인가 코드), `state`
+- **Response (Success 201)**:
+    ```json
+    {
+      "timestamp": "2026-05-29T14:00:00Z",
+      "status": 201,
+      "data": {
+        "accessToken": "<JWT_ACCESS_TOKEN>",
+        "refreshToken": "<JWT_REFRESH_TOKEN>",
+        "user": {
+          "id": "uuid",
+          "email": "user@student.42gyeongsan.kr",
+          "nickname": "user42",
+          "avatar": "https://cdn.intra.42.fr/...",
+          "status": "ONLINE"
+        }
+      },
+      "error": null
+    }
+    ```
+- **Errors**:
+    - `401 Unauthorized`: 유효하지 않은 42 인가 코드
+
 ### Chat APIs
 
 All endpoints below are prefixed with `/api/chat` and require **JWT Bearer Token** (`Authorization: Bearer <accessToken>`).
