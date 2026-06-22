@@ -89,10 +89,24 @@ docker-compose up --build
 ## 8. Git Flow & Commit Conventions
 
 ### Branching Strategy
-본 프로젝트는 **Git Flow** 전략을 기반으로 협업을 진행합니다:
-- **`main`**: 상용 서비스 배포 브랜치. 모든 변경사항은 엄격히 검증되어야 합니다.
-- **`develop`**: 개발 통합 브랜치. 주간/스프린트별로 개발 완료된 기능들이 병합됩니다.
-- **`feature/*`**: 개별 기능 개발 브랜치 (예: `feature/auth`, `feature/game`). `develop` 브랜치로부터 생성되어 작업 완료 후 Pull Request 및 1명 이상의 승인을 거쳐 `develop`에 병합됩니다.
+본 프로젝트(transcendence_deploy, transcendence_backend, transcendence_frontend 3개 저장소 공통)는 다음 브랜치 전략을 따릅니다:
+
+- **`main`**: 릴리스 브랜치. `dev`에서 검증이 끝난 변경사항만 머지되며, 릴리스 시점마다 `vX.Y.Z` 태그를 남깁니다.
+- **`dev`**: 발행 전 테스트(통합) 브랜치. 모든 기능 브랜치는 PR을 통해 이 브랜치로 먼저 병합되어 통합 테스트를 거칩니다. `dev`가 안정화되면 PR로 `main`에 머지하고 태그를 생성합니다.
+- **`<type>/<issue-number>-<short-description>`**: 개별 작업 브랜치. GitHub Projects/Issues의 이슈 번호에 맞춰 `dev`에서 분기합니다.
+  - `<type>`: `feature`(또는 `feat`) / `fix` / `docs` / `chore` / `refactor` / `test` 중 작업 성격에 맞는 값
+  - `<issue-number>`: 연동된 이슈 번호
+  - `<short-description>`: 영문 kebab-case 요약
+  - 예: `feature/11-profile-api`, `feat/13-friends-api`, `docs/13-friends-api-docs`, `fix/9-jwt-guard-bug`
+  - 작업 완료 후 PR을 `dev`로 올리고, 1명 이상의 승인 및 CI 통과 후 머지합니다. 머지된 브랜치는 삭제합니다.
+
+```
+main  ──●────────────●─────────────▶  (release, tagged vX.Y.Z)
+         \            \
+dev    ───●──●──●──●──●─────────────▶  (pre-release test/integration)
+            \   \   \
+issue/*      ●   ●   ●                (feature/<#>-desc, fix/<#>-desc, ...)
+```
 
 ### Commit Message Convention
 모든 커밋 메시지는 협업 규칙을 따르기 위해 다음 형식을 준수합니다:
