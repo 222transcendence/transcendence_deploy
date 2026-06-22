@@ -10,21 +10,206 @@
   "data": { ... },
   "error": null
 }
-\`\`\`
+```
 
 ## 2. API Endpoint Details (Highlight)
 
-### [GET] /api/v1/matches/{id}/replay
-- **Description**: 종료된 게임의 모든 액션 로그를 리플레이 형식으로 반환.
-- **Query Params**: \`speed\` (Optional), \`turn_range\` (Optional)
-- **Error Codes**:
-    - \`403\`: 권한 없음 (비공개 매치)
-    - \`404\`: 매치 정보 없음
+### Authentication APIs
 
-### [POST] /api/v1/match/queue
+#### [POST] /api/auth/signup
+- **Description**: 이메일과 패스워드로 신규 사용자 회원가입을 처리합니다.
+- **Request Body**:
+    ```json
+    {
+      "email": "user@example.com",
+      "nickname": "new_user",
+      "password": "securepassword123"
+    }
+    ```
+- **Response (Success 201)**:
+    ```json
+    {
+      "timestamp": "2026-05-29T14:00:00Z",
+      "status": 201,
+      "data": {
+        "id": "uuid-v4-string",
+        "email": "user@example.com",
+        "nickname": "new_user",
+        "avatar": "default_avatar.png",
+        "status": "OFFLINE",
+        "wins": 0,
+        "losses": 0,
+        "createdAt": "2026-05-29T14:00:00Z",
+        "updatedAt": "2026-05-29T14:00:00Z"
+      },
+      "error": null
+    }
+    ```
+- **Error Codes**:
+    - `400 Bad Request` (E_BAD_REQUEST): 입력 데이터 유효성 검사 실패 (짧은 비밀번호, 이메일 형식 등)
+    - `409 Conflict` (E_CONFLICT): 이미 가입된 이메일 또는 사용 중인 닉네임
+
+#### [POST] /api/auth/login
+- **Description**: 사용자 자격 증명을 검증하고 Access/Refresh Token을 발급합니다.
+- **Request Body**:
+    ```json
+    {
+      "email": "user@example.com",
+      "password": "securepassword123"
+    }
+    ```
+- **Response (Success 200)**:
+    ```json
+    {
+      "timestamp": "2026-05-29T14:00:00Z",
+      "status": 200,
+      "data": {
+        "accessToken": "jwt-access-token-string",
+        "refreshToken": "jwt-refresh-token-string",
+        "user": {
+          "id": "uuid-v4-string",
+          "email": "user@example.com",
+          "nickname": "new_user",
+          "avatar": "default_avatar.png",
+          "status": "ONLINE"
+        }
+      },
+      "error": null
+    }
+    ```
+- **Error Codes**:
+    - `401 Unauthorized` (E1001): 잘못된 비밀번호 또는 가입되지 않은 이메일
+
+#### [POST] /api/auth/refresh
+- **Description**: 만료된 Access Token을 갱신합니다.
+- **Request Body**:
+    ```json
+    {
+      "refreshToken": "jwt-refresh-token-string"
+    }
+    ```
+- **Response (Success 200)**:
+    ```json
+    {
+      "timestamp": "2026-05-29T14:00:00Z",
+      "status": 200,
+      "data": {
+        "accessToken": "new-jwt-access-token-string"
+      },
+      "error": null
+    }
+    ```
+- **Error Codes**:
+    - `401 Unauthorized` (E1001): 유효하지 않거나 탈취된/로그아웃된 Refresh Token
+
+#### [POST] /api/auth/logout
+- **Description**: 로그인 세션을 종료하고 Refresh Token을 무효화합니다 (JWT Bearer Token 필요).
+- **Headers**: `Authorization: Bearer <accessToken>`
+- **Response (Success 200)**:
+    ```json
+    {
+      "timestamp": "2026-05-29T14:00:00Z",
+      "status": 200,
+      "data": {
+        "success": true
+      },
+      "error": null
+    }
+    ```
+
+### Game APIs
+
+#### [GET] /api/v1/matches/{id}/replay
+- **Description**: 종료된 게임의 모든 액션 로그를 리플레이 형식으로 반환.
+- **Query Params**: `speed` (Optional), `turn_range` (Optional)
+- **Error Codes**:
+    - `403`: 권한 없음 (비공개 매치)
+    - `404`: 매치 정보 없음
+
+#### [POST] /api/v1/match/queue
+```json
+{ "deck_id": 101, "match_type": "RANKED" }
+```
+
+### [GET] /api/users/me
+- **Description**: 로그인한 사용자 본인의 전체 프로필 정보를 가져옴. (비밀번호 제외)
+- **Authentication**: JWT 필수
+- **Success Response (200 OK)**:
     \`\`\`json
-    { "deck_id": 101, "match_type": "RANKED" }
+    {
+      "timestamp": "2026-05-29T10:00:00Z",
+      "status": 200,
+      "data": {
+        "id": "uuid-string",
+        "email": "user@example.com",
+        "nickname": "my_nickname",
+        "avatar": "default_avatar.png",
+        "status": "ONLINE",
+        "wins": 10,
+        "losses": 5,
+        "createdAt": "2026-05-29T00:00:00Z",
+        "updatedAt": "2026-05-29T00:00:00Z"
+      },
+      "error": null
+    }
     \`\`\`
+
+### [GET] /api/users/{id}
+- **Description**: 특정 사용자 ID에 해당하는 타인의 프로필 정보를 가져옴. 민감한 정보(이메일, 비밀번호)는 제외하고 공개 가능한 데이터만 반환함.
+- **Authentication**: JWT 필수
+- **Success Response (200 OK)**:
+    \`\`\`json
+    {
+      "timestamp": "2026-05-29T10:00:00Z",
+      "status": 200,
+      "data": {
+        "id": "uuid-string",
+        "nickname": "target_nickname",
+        "avatar": "default_avatar.png",
+        "status": "ONLINE",
+        "wins": 12,
+        "losses": 8,
+        "createdAt": "2026-05-29T00:00:00Z",
+        "updatedAt": "2026-05-29T00:00:00Z"
+      },
+      "error": null
+    }
+    \`\`\`
+- **Error Codes**:
+    - \`404\`: 존재하지 않는 사용자 ID
+
+### [PATCH] /api/users/me
+- **Description**: 로그인한 본인의 \`nickname\` 또는 \`avatar\`를 수정함. 닉네임 수정 시 중복 검사를 거침.
+- **Authentication**: JWT 필수
+- **Request Body**:
+    \`\`\`json
+    {
+      "nickname": "new_nickname",
+      "avatar": "new_avatar.png"
+    }
+    \`\`\`
+- **Success Response (200 OK)**:
+    \`\`\`json
+    {
+      "timestamp": "2026-05-29T10:00:00Z",
+      "status": 200,
+      "data": {
+        "id": "uuid-string",
+        "email": "user@example.com",
+        "nickname": "new_nickname",
+        "avatar": "new_avatar.png",
+        "status": "ONLINE",
+        "wins": 10,
+        "losses": 5,
+        "createdAt": "2026-05-29T00:00:00Z",
+        "updatedAt": "2026-05-29T00:00:00Z"
+      },
+      "error": null
+    }
+    \`\`\`
+- **Error Codes**:
+    - \`400\`: 유효성 검사 실패 (닉네임 길이 초과 등)
+    - \`409\`: 닉네임 중복 발생 (\`E_CONFLICT\`)
 
 #### Rate Limit Rationale & Client Retry Guidance
 
@@ -85,3 +270,54 @@ async function enqueueWithRetry(body) {
 | \`E1001\` | 인증 토큰 만료 | 401 Unauthorized |
 | \`E2001\` | 매칭 큐 중복 진입 | 400 Bad Request |
 | \`E3001\` | 존재하지 않는 덱 선택 | 404 Not Found |
+
+## Friends API (P2-08)
+
+> Auth merge 전 임시 처리: current user 식별은 `x-user-id` 헤더를 사용함.
+
+### [POST] /api/friends/{userId}
+- **Description**: 친구 요청 생성
+- **Path Params**: `userId` (요청 대상 유저 id)
+- **Headers**: `x-user-id` (임시 current user id)
+- **Behavior**:
+  - 자기 자신 요청 방지
+  - 대상 유저 존재 검증
+  - 양방향 중복/PENDING 요청 방지
+  - 기존 `ACCEPTED` 관계 존재 시 `409`
+
+### [PATCH] /api/friends/{requestId}
+- **Description**: 친구 요청 수락/거절
+- **Path Params**: `requestId`
+- **Headers**: `x-user-id` (임시 current user id)
+- **Body**:
+```json
+{ "action": "accept" }
+```
+또는
+```json
+{ "action": "reject" }
+```
+- **Behavior**:
+  - 요청 수신자만 처리 가능
+  - `PENDING` 상태만 처리 가능
+  - `accept`: `ACCEPTED`로 변경
+  - `reject`: `PENDING` row 삭제
+
+### [DELETE] /api/friends/{userId}
+- **Description**: `ACCEPTED` 친구 관계 삭제
+- **Path Params**: `userId` (삭제 대상 친구 유저 id)
+- **Headers**: `x-user-id` (임시 current user id)
+
+### [GET] /api/friends
+- **Description**: 내 친구 목록 조회
+- **Headers**: `x-user-id` (임시 current user id)
+- **Response Fields (each item)**:
+  - `id`
+  - `nickname`
+  - `status` (User 엔티티 status 필드 기반)
+
+### Out of Scope
+- JWT/Guard 기반 인증 처리
+- Redis/WebSocket/session 기반 실시간 온라인 상태 동기화
+- 별도 거절 상태(enum `REJECTED`) 추가
+- 금지 endpoint (`/friends/request`, `/friends/accept`, `/friends/reject`) 도입
