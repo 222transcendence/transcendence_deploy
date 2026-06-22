@@ -33,7 +33,7 @@
 | ID | Task | Owner | Status | Implementation Evidence | Validation Evidence | Commit(s) |
 |---|---|---|---|---|---|---|
 | P2-01 | Authentication: signup/login/profile update E2E |  | TODO |  |  |  |
-| P2-02 | Password hashing and salting verification in DB |  | TODO |  |  |  |
+| P2-02 | Password hashing and salting verification in DB | hijae | Done | auth.service.ts | test_auth.sh E2E signup test | feat(auth): implement signup api with password hashing [#7] [P2-02] |
 | P2-03 | Basic Pong gameplay loop complete |  | TODO |  |  |  |
 | P2-04 | WebSocket real-time sync for game state |  | TODO |  |  |  |
 | P2-05 | Chat messaging latency target (<1s) validated |  | TODO |  |  |  |
@@ -72,7 +72,7 @@
 | Phase | Done | In Progress | Blocked | TODO |
 |---|---:|---:|---:|---:|
 | Phase 1 | 6 | 0 | 0 | 0 |
-| Phase 2 | 0 | 0 | 0 | 6 |
+| Phase 2 | 1 | 0 | 0 | 5 |
 | Phase 3 | 0 | 0 | 0 | 6 |
 | Phase 4 | 0 | 0 | 0 | 6 |
 
