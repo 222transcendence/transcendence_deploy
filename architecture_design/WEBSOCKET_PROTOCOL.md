@@ -64,3 +64,113 @@ sequenceDiagram
     3. 체크포인트와 함께 보관된 액션 로그(가능한 경우 Redis Streams 또는 영속 로그)를 재생하여 최신 상태로 보완합니다.
   - 복구 시도는 지수 백오프(예: 초기 100ms, 최대 2s)와 최대 재시도 횟수(예: 5회)를 적용합니다. 모든 시도가 실패하면 서버는 사용자에게 복구 불가 알림을 보내거나 세션을 안전하게 종료합니다.
   - 복구 과정은 메트릭으로 수집합니다: 복구 성공률, 체크포인트 활용률, 재시도 횟수, 복구 지연 등을 모니터링합니다.
+
+---
+
+## 5. Chat Namespace (`/chat`)
+
+### 5.1 연결 인증
+
+Chat WebSocket은 `/chat` namespace에서 동작합니다. 연결 시 반드시 JWT 토큰을 전달해야 합니다.
+
+```json
+// 핸드셰이크 auth payload
+{
+  "auth": {
+    "token": "Bearer <JWT_ACCESS_TOKEN>"
+  }
+}
+```
+
+또는 쿼리 파라미터로 전달:
+
+```
+/chat?token=Bearer <JWT_ACCESS_TOKEN>
+```
+
+토큰이 없거나 유효하지 않으면 서버가 즉시 소켓을 disconnect합니다.
+
+### 5.2 이벤트 정의
+
+#### 클라이언트 → 서버: `send_message`
+
+```json
+{
+  "content": "안녕하세요!",
+  "roomId": "optional-room-id",
+  "type": "NORMAL"
+}
+```
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| `content` | string | ✓ | 메시지 내용 (비어있을 수 없음) |
+| `roomId` | string | - | 특정 채팅방 ID (없으면 글로벌 채널) |
+| `type` | `"NORMAL"` \| `"INVITE"` | - | 메시지 유형 (기본값: `"NORMAL"`) |
+
+#### 서버 → 전체 클라이언트: `receive_message`
+
+```json
+{
+  "id": "uuid-v4",
+  "content": "안녕하세요!",
+  "roomId": null,
+  "type": "NORMAL",
+  "createdAt": "2026-06-22T12:00:00.000Z",
+  "sender": {
+    "id": "user-uuid",
+    "nickname": "player1"
+  }
+}
+```
+
+### 5.3 연결 시퀀스
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant G as ChatGateway
+    participant J as JwtService
+    participant DB as PostgreSQL
+
+    C->>G: CONNECT /chat (auth.token)
+    G->>J: verifyAsync(token)
+    alt 유효하지 않은 토큰
+        J-->>G: throw error
+        G->>C: disconnect()
+    else 유효한 토큰
+        J-->>G: { sub: userId, ... }
+        G->>DB: findUser(userId)
+        DB-->>G: User entity
+        G->>G: client.data.user = user
+        G-->>C: connected
+    end
+```
+
+### 5.4 메시지 흐름
+
+```mermaid
+sequenceDiagram
+    participant C1 as Client (Sender)
+    participant G as ChatGateway
+    participant S as ChatService
+    participant DB as PostgreSQL
+    participant All as All Clients
+
+    C1->>G: send_message { content, roomId, type }
+    G->>S: saveMessage(senderId, content, roomId, type)
+    S->>DB: INSERT INTO chat_messages
+    DB-->>S: ChatMessage entity
+    S-->>G: saved message
+    G->>All: receive_message { id, content, sender, createdAt, ... }
+```
+
+### 5.5 REST 보완 API
+
+채팅 히스토리는 WebSocket 외 REST API로도 조회 가능합니다 (JWT 인증 필요).
+
+```
+GET /api/chat/history
+```
+
+→ 최근 50개 메시지를 `createdAt` 오름차순으로 반환. 상세 스펙은 `API_SPECIFICATION.md` 참조.
