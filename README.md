@@ -98,7 +98,7 @@ docker-compose up --build
   - `<issue-number>`: 연동된 이슈 번호
   - `<short-description>`: 영문 kebab-case 요약
   - 예: `feature/11-profile-api`, `feat/13-friends-api`, `docs/13-friends-api-docs`, `fix/9-jwt-guard-bug`
-  - 작업 완료 후 PR을 `dev`로 올리고, 1명 이상의 승인 및 CI 통과 후 머지합니다. 머지된 브랜치는 추후 참고를 위해 삭제하지 않고 남겨둡니다.
+  - 작업 완료 후 PR을 `dev`로 올리고, 1명 이상의 승인 및 CI 통과 후 머지합니다. 머지된 브랜치는 머지 후 삭제합니다.
 
 ```
 main  ──●────────────●─────────────▶  (release, tagged vX.Y.Z)
