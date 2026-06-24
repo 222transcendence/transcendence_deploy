@@ -34,7 +34,7 @@
 |---|---|---|---|---|---|---|
 | P2-01 | Authentication: signup/login/profile update E2E |  | TODO |  |  |  |
 | P2-02 | Password hashing and salting verification in DB | hijae | Done | auth.service.ts | test_auth.sh E2E signup test | feat(auth): implement signup api with password hashing [#7] [P2-02] |
-| P2-03 | Basic Pong gameplay loop complete |  | TODO |  |  |  |
+| P2-03 | Basic TCG card duel gameplay loop (Dice, Initiative, Status Effects) complete | yuhyoon | Done | game-engine.ts, game.service.ts | game-engine.spec.ts unit tests pass | feat(game): implement core card duel engine with dice, initiative, status effects [P2-03] |
 | P2-04 | WebSocket real-time sync for game state |  | TODO |  |  |  |
 | P2-05 | Chat messaging latency target (<1s) validated |  | TODO |  |  |  |
 | P2-06 | Friend system flow: add/accept/status update |  | TODO |  |  |  |
@@ -46,8 +46,8 @@
 | ID | Task | Owner | Status | Implementation Evidence | Validation Evidence | Commit(s) |
 |---|---|---|---|---|---|---|
 | P3-01 | Remote players match flow stable under reconnect |  | TODO |  |  |  |
-| P3-02 | AI opponent logic with adjustable difficulty |  | TODO |  |  |  |
-| P3-03 | Match result persistence and score history integrity |  | TODO |  |  |  |
+| P3-02 | AI opponent card strategy logic complete |  | TODO |  |  |  |
+| P3-03 | Match result persistence and score history integrity | yuhyoon | Done | game.service.ts (recordMatchHistory) | game-engine.spec.ts game-over tests | feat(game): implement game over logic, match persistence, and redis teardown [P3-03] |
 | P3-04 | Prometheus metrics exposed and scraped |  | TODO |  |  |  |
 | P3-05 | Grafana dashboard with CPU/memory/network panels |  | TODO |  |  |  |
 | P3-06 | Monitoring alert rule smoke test complete |  | TODO |  |  |  |
@@ -72,8 +72,8 @@
 | Phase | Done | In Progress | Blocked | TODO |
 |---|---:|---:|---:|---:|
 | Phase 1 | 6 | 0 | 0 | 0 |
-| Phase 2 | 1 | 0 | 0 | 5 |
-| Phase 3 | 0 | 0 | 0 | 6 |
+| Phase 2 | 2 | 0 | 0 | 4 |
+| Phase 3 | 1 | 0 | 0 | 5 |
 | Phase 4 | 0 | 0 | 0 | 6 |
 
 ## PM Weekly Review Log
