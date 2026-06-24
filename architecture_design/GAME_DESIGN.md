@@ -28,3 +28,36 @@
 ## 3. Skill System (Trigger-Action)
 - **Trigger**: 특정 페이즈 + 특정 카드 조합 (예: 근거리 공격 + 특수 2장).
 - **Action**: 공격력 가산, 카드 파괴, 상태이상 부여 등.
+
+## 4. 현재 backend 구현(`feat/P3-02-P3-03-game-engine`, in review)과의 차이
+P3-02/P3-03 PR 코드를 직접 확인한 결과, 위 설계 문서가 가정하는 실시간 sync action(`CARDS_DRAWN`,
+`MOVE_SUBMITTED`, `DISTANCE_CHANGED`, `ATTACK_DECLARED`, `DEFENSE_SUBMITTED`, `DAMAGE_APPLIED`,
+`TURN_END` 등)은 아직 구현되어 있지 않음. 실제로는:
+- WebSocket/Socket.io 게이트웨이 없이 **순수 REST + Redis** 구조 (`POST /game/rooms`,
+  `/game/rooms/:id/join`, `/game/rooms/:id/submit`, `GET /game/rooms`만 존재).
+- 방 단건 상태를 조회하는 GET 엔드포인트가 없어, 상대방이 카드를 제출했는지/페이즈가 바뀌었는지
+  알 수 있는 방법이 클라이언트에 없음.
+- `submitCards` 응답에 최종 HP만 반영되고, 주사위 성공 횟수·데미지 분해·스킬 발동 여부 등
+  애니메이션에 필요한 중간 연산 값이 노출되지 않음.
+- `Character.skills` 필드는 엔티티에 존재하지만 트리거 로직(`Skill System`)은 아직 미구현.
+
+후속 정리는 `transcendence_backend` 신규 이슈([P3-0X] 게임 상태 조회/실시간 푸시 및 액션 디테일
+노출 보강)에서 추적함.
+
+## 5. Frontend Animation Hooks (P3-11, [#6](https://github.com/222transcendence/transcendence_frontend/issues/6))
+위 백엔드 갭으로 인해 실데이터 연동 없이, 애니메이션 컴포넌트만 먼저 구현함
+(`transcendence_frontend` `feature/6-phase-result-animations` 브랜치, `/dev/phase-animations`
+데모 라우트 — 실제 게임 페이지(`/game/:roomId`, [#5](https://github.com/222transcendence/transcendence_frontend/issues/5))에는
+아직 연결되지 않음).
+
+| 컴포넌트 | 위치 | Props |
+| :--- | :--- | :--- |
+| `PhaseBanner` | `src/components/game/PhaseBanner.tsx` | `phase: GamePhase` |
+| `DiceRollAnimation` | `src/components/game/DiceRollAnimation.tsx` | `result: DiceRollResult`, `onComplete?` |
+| `DamageFloatingNumber` | `src/components/game/DamageFloatingNumber.tsx` | `popup: DamagePopup`, `onDone` |
+| `SkillEffectOverlay` | `src/components/game/SkillEffectOverlay.tsx` | `trigger: SkillEffectTrigger`, `onDone` |
+| `GameEndModal` | `src/components/game/GameEndModal.tsx` | `summary: MatchSummary`, `isWinner`, `onRematch`, `onBackToLobby` |
+
+타입은 `src/types/gameAnimation.ts`에 정의. `DiceRollResult.success`, `DamagePopup.amount`,
+`SkillEffectTrigger`는 현재 backend 응답에 없는 값이라 #5 게임 보드 UI와 백엔드 갭 이슈가
+해결된 뒤, 실제 응답 필드로 매핑하는 작업이 별도로 필요함.
