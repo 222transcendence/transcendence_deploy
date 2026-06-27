@@ -15,26 +15,47 @@
 - `updatedAt`: Timestamp
 
 ### Character
-- `id`: Primary Key
-- `name`: (e.g., "Magician")
-- `base_hp`: Integer
-- `base_atk`: Integer
-- `base_def`: Integer
-- `skills`: JSON (Skill triggers and effects)
+- `id`: Primary Key (int, auto-increment) — 고정 소수 행이라 uuid 불필요
+- `name`: String (Unique, plain varchar — **DB enum 아님**. 4번째 캐릭터 추가 시 enum alter 없이 row만 추가하면 되도록 설계)
+- `baseHp` / `baseAtk` / `baseDef`: Integer
+- `skills`: JSONB, default `[]`. 구조: `{ name, triggerDistance, triggerPhase, requiredCards, effect }[]`
+
+**시드 데이터 (3종, `AddGameSchema` 마이그레이션에 포함):**
+
+| name | baseHp | baseAtk | baseDef | skills |
+| --- | --- | --- | --- | --- |
+| MAGE | 12 | 7 | 7 | 정밀사격/전격/가시나무 숲/지략 4종 (실데이터, 출처: `게임 기능 명세서/게임 기능 명세서 - 캐릭터_마법사.md`) |
+| WARRIOR | 12 | 7 | 7 | `[]` — **placeholder**, 전사 캐릭터 설계 문서가 아직 없음 |
+| ROGUE | 12 | 7 | 7 | `[]` — **placeholder**, 도적 캐릭터 설계 문서가 아직 없음 |
+
+> ⚠️ TODO: 전사/도적의 실제 스탯·스킬은 별도 설계가 필요함. 현재는 마법사와 동일한 베이스 스탯에 스킬 없이 시드되어 있음. 설계가 나오면 새 마이그레이션으로 UPDATE할 것 (P3-06 스킬 시스템 착수 전 완료 권장).
 
 ### Card (Action Card)
-- `id`: Primary Key
-- `type`: (MOVE, ATK_SWORD, ATK_GUN, DEF, SPECIAL)
-- `value_top`: Integer
-- `value_bottom`: Integer
+- `id`: Primary Key (int, auto-increment)
+- `type`: Postgres enum (`MOVE`, `ATK_SWORD`, `ATK_GUN`, `DEF`, `SPECIAL`) — 게임 로직(거리 유효성 검사, State Machine)이 분기하는 고정 카테고리라 enum으로 고정
+- `valueTop` / `valueBottom`: Integer
+
+**시드 데이터 (20장, `AddGameSchema` 마이그레이션에 포함):**
+
+| type | 매수 | valueTop/valueBottom |
+| --- | --- | --- |
+| MOVE | 5 | 1/0, 2/0, 3/0, 4/0, 5/0 |
+| ATK_SWORD | 4 | 2/1, 3/1, 4/2, 5/2 |
+| ATK_GUN | 4 | 2/1, 3/1, 4/2, 5/2 |
+| DEF | 4 | 2/1, 3/1, 4/2, 5/2 |
+| SPECIAL | 3 | 1/1, 2/1, 3/2 |
+
+> ⚠️ 위 수치는 **provisional**(임시) 값으로, 어느 설계 문서에도 카드별 정확한 수치가 정의되어 있지 않아 이슈의 완료기준(매수 구성)만 맞춰 채움. 주사위 엔진(#17)·스킬 시스템(#19) 작업 시 실제 밸런스에 맞게 조정 필요.
 
 ### MatchHistory
-- `id`: Primary Key
-- `host_user`: FK to User
-- `guest_user`: FK to User
-- `winner`: FK to User
-- `turns_played`: Integer
-- `match_data`: JSON (Log of all actions for replay)
+- `id`: Primary Key (UUID) — User/Friend와 동일하게 uuid PK 일관성 유지
+- `hostUser` / `guestUser`: FK to User (`ON DELETE CASCADE`)
+- `winner`: FK to User, **nullable** — 게임 기능 명세서의 "무승부(드로)" 규칙 반영 (`ON DELETE SET NULL`)
+- `turnsPlayed`: Integer
+- `matchData`: JSONB (전체 액션 로그, replay용)
+- `createdAt`: Timestamp
+
+> 📝 구현 노트: `matchData`는 `MatchHistory` 한 행에 JSONB 한 컬럼으로 전체 로그를 저장하는 방식으로 구현함 (#14 이슈 본문 기준). `DATABASE_MODELING.md`의 ER 다이어그램에 있는 별도 `MATCH_ACTION_LOG` 테이블(턴 단위 행 분리)은 채택하지 않았음 — 현재 스케일에서는 단일 JSONB가 더 단순하고, 추후 로그가 비대해지면 분리/파티셔닝을 고려할 수 있음.
 
 ## 2. Real-time Session State (Stored in Redis)
 실시간 대전 중인 방의 상태는 고속 처리를 위해 Redis에 임시 보관함.
