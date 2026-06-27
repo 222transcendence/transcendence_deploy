@@ -38,6 +38,8 @@ erDiagram
         enum phase "MOVE, ATTACK, DEFENSE"
         jsonb action_data "Optimized JSON storage"
     }
+    %% 구현 노트(#14): 실제 구현은 위 두 엔티티를 분리하지 않고, MatchHistory.id를 uuid PK로
+    %% 두고 matchData(jsonb) 한 컬럼에 전체 액션 로그를 저장함. 상세: DATABASE_DESIGN.md 참고.
 
     FRIENDSHIP {
         int user_a_id FK
