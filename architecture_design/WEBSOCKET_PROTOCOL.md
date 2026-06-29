@@ -1,5 +1,61 @@
 # Game Sync Protocol & WebSocket Sequence (v2)
 
+## 0. Lobby & Room Management Protocol
+`/ws/game/{room_id}` 연결 이전, 로비 화면은 별도 엔드포인트 `/ws/lobby`에 연결하여 방 목록과 입장/대기 상태를 동기화함. 메시지 envelope은 [3. Message Envelope Design](#3-message-envelope-design)과 동일한 `{ type, payload, seq }` 구조를 따름. (Backend Epic #2 미구현 상태이며, 이 절은 FE 작업(P3-09)을 위해 선제적으로 정의한 계약임 — 백엔드 구현 시 본 스펙을 기준으로 삼을 것)
+
+방 멤버십(host/guest)은 WebSocket 연결 인스턴스가 아니라 인증된 사용자(JWT)를 기준으로 서버에 보관됨. 따라서 클라이언트가 로비 화면에서 대기실 화면으로 이동하며 소켓을 재연결해도, 서버는 토큰으로 사용자를 식별해 기존 방 소속 상태를 유지하고 `GET_ROOM`에 응답할 수 있어야 함.
+
+### 0.1. Room Object
+```json
+{
+  "id": "room-uuid",
+  "host": { "userId": "uuid", "nickname": "host_nick", "characterId": "magician", "ready": false },
+  "guest": { "userId": "uuid", "nickname": "guest_nick", "characterId": "knight", "ready": false } | null,
+  "status": "WAITING | IN_GAME",
+  "createdAt": "2026-06-22T10:00:00Z"
+}
+```
+
+### 0.2. Client → Server Messages
+| Type | Payload | Description |
+| :--- | :--- | :--- |
+| `LIST_ROOMS` | `{}` | 현재 방 목록 스냅샷 요청 (연결 시 자동 수신도 됨) |
+| `CREATE_ROOM` | `{ characterId }` | 새 방 생성, 본인이 host가 됨 |
+| `JOIN_ROOM` | `{ roomId, characterId }` | 대기중인 방에 guest로 입장 |
+| `GET_ROOM` | `{ roomId }` | 특정 방의 현재 상태 조회. 인증된 사용자가 이미 host/guest로 등록된 방이면 즉시 `ROOM_UPDATED` 응답 (대기실 페이지 진입/재연결 시 사용) |
+| `LEAVE_ROOM` | `{ roomId }` | 방 퇴장 (host 퇴장 시 방 폭파) |
+| `SET_READY` | `{ roomId, ready }` | 준비 완료/취소 토글 |
+
+### 0.3. Server → Client Messages
+| Type | Payload | Description |
+| :--- | :--- | :--- |
+| `ROOM_LIST` | `{ rooms: Room[] }` | 전체 방 목록 (연결 시 + 변경 발생 시 broadcast) |
+| `ROOM_UPDATED` | `{ room: Room }` | 특정 방의 상태 변경 (입장/캐릭터 선택/준비 상태) |
+| `ROOM_CLOSED` | `{ roomId }` | 방 삭제 (host 퇴장 등) |
+| `GAME_START` | `{ roomId }` | host/guest 모두 ready 시 발송, 클라이언트는 `/ws/game/{roomId}`로 전환 |
+| `ACTION_REJECTED` | `{ message }` | 잘못된 요청(예: 이미 가득 찬 방 입장 시도) |
+
+### 0.4. Sequence
+```mermaid
+sequenceDiagram
+    participant C1 as Client A (Host)
+    participant C2 as Client B (Guest)
+    participant S as Server (Lobby)
+
+    C1->>S: CONNECT /ws/lobby
+    S->>C1: ROOM_LIST
+    C1->>S: CREATE_ROOM (characterId)
+    S->>C1: ROOM_UPDATED (room, host set)
+    S-->>C2: ROOM_LIST (broadcast)
+    C2->>S: JOIN_ROOM (roomId, characterId)
+    S->>C1: ROOM_UPDATED (guest joined)
+    S->>C2: ROOM_UPDATED (guest joined)
+    C1->>S: SET_READY (true)
+    C2->>S: SET_READY (true)
+    S->>C1: GAME_START (roomId)
+    S->>C2: GAME_START (roomId)
+```
+
 ## 1. Game Start Sequence
 서버와 클라이언트 간의 초기 연결 및 동기화 프로세스입니다.
 
@@ -174,3 +230,42 @@ GET /api/chat/history
 ```
 
 → 최근 50개 메시지를 `createdAt` 오름차순으로 반환. 상세 스펙은 `API_SPECIFICATION.md` 참조.
+
+---
+
+## 6. Game Namespace (`/game`)
+
+### 6.1 연결 인증
+
+Game WebSocket은 `/game` namespace에서 동작하며, 인증 방식은 `/chat`(5.1)과 동일한 컨벤션을 따릅니다 — 핸드셰이크 `auth.token` 또는 `?token=` 쿼리 파라미터로 `Bearer <JWT_ACCESS_TOKEN>` 전달. 토큰이 없거나 유효하지 않으면 서버가 즉시 소켓을 disconnect합니다.
+
+두 네임스페이스의 공통 토큰 추출 로직은 `src/common/websocket/ws-jwt.util.ts`의 `extractWsToken()`을 공유합니다 (현재 `/game`에서 사용 중이며, `/chat`도 동일 컨벤션이라 추후 이 유틸로 통합 가능).
+
+### 6.2 연결 시퀀스
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant G as GameGateway
+    participant J as JwtService
+    participant DB as PostgreSQL
+
+    C->>G: CONNECT /game (auth.token)
+    G->>J: verify(token)
+    alt 유효하지 않은 토큰 / 토큰 없음
+        J-->>G: throw error
+        G->>C: disconnect()
+    else 유효한 토큰
+        J-->>G: { sub: userId, ... }
+        G->>DB: findOne(userId)
+        DB-->>G: User entity
+        G->>G: client.data.user = user
+        G-->>C: connected
+    end
+```
+
+### 6.3 현재 구현 범위
+
+이 이슈(P4-01)는 게이트웨이 연결/인증/로깅만 다룹니다. 방 입장, 카드 제출, 페이즈 브로드캐스트 등 실제 게임 이벤트는 후속 이슈(P4-03~05, wave 3)에서 이 네임스페이스에 `@SubscribeMessage` 핸들러로 추가될 예정입니다 — 이벤트 스펙은 그때 이 섹션에 추가합니다.
+
+게임 룸/State Machine 데이터 모델(`Character`/`Card`/`MatchHistory` 엔티티, `GameModule`)은 별도 PR([#40](https://github.com/222transcendence/transcendence_backend/pull/40), [#47](https://github.com/222transcendence/transcendence_backend/pull/47))에서 진행 중이며, 두 PR이 동일 파일을 서로 다르게 구현해 충돌 중이라 이 게이트웨이는 의도적으로 그쪽 모듈/엔티티에 의존하지 않게 만들었습니다.

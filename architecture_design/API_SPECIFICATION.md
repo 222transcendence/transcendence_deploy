@@ -337,6 +337,168 @@ async function enqueueWithRetry(body) {
 | \`E2001\` | 매칭 큐 중복 진입 | 400 Bad Request |
 | \`E3001\` | 존재하지 않는 덱 선택 | 404 Not Found |
 
+## Game Engine & Matchmaking API (P3-02, P3-03)
+
+### [GET] /api/game/rooms
+- **Description**: 현재 대기 중인(WAITING 상태인) 모든 게임 방 목록을 조회합니다.
+- **Authentication**: JWT 필수
+- **Success Response (200 OK)**:
+    ```json
+    {
+      "timestamp": "2026-06-23T10:00:00Z",
+      "status": 200,
+      "data": [
+        {
+          "id": "room-uuid-string",
+          "status": "WAITING",
+          "host": {
+            "userId": "host-uuid-string",
+            "nickname": "host_user",
+            "characterId": 1,
+            "hp": 20,
+            "cardsInHand": [],
+            "cardsSubmitted": []
+          },
+          "distance": 3,
+          "currentTurn": 1,
+          "statusEffects": {
+            "host": [],
+            "guest": []
+          }
+        }
+      ],
+      "error": null
+    }
+    ```
+
+### [POST] /api/game/rooms
+- **Description**: 대기 중인 새로운 게임 방(WAITING)을 생성합니다.
+- **Authentication**: JWT 필수
+- **Request Body**:
+    ```json
+    {
+      "characterId": 1
+    }
+    ```
+- **Success Response (201 Created)**:
+    ```json
+    {
+      "timestamp": "2026-06-23T10:00:00Z",
+      "status": 201,
+      "data": {
+        "id": "room-uuid-string",
+        "status": "WAITING",
+        "host": {
+          "userId": "host-uuid-string",
+          "nickname": "host_user",
+          "characterId": 1,
+          "hp": 20,
+          "cardsInHand": [],
+          "cardsSubmitted": []
+        },
+        "distance": 3,
+        "currentTurn": 1,
+        "statusEffects": {
+          "host": [],
+          "guest": []
+        }
+      },
+      "error": null
+    }
+    ```
+
+### [POST] /api/game/rooms/{id}/join
+- **Description**: 대기 상태인 게임 방에 게스트로 참여합니다. 참여 즉시 두 유저에게 카드가 5장씩 분배되며 게임 상태는 `IN_GAME`으로 업데이트되고 `MOVE` 페이즈가 시작됩니다.
+- **Authentication**: JWT 필수
+- **Path Params**: `id` (방 UUID)
+- **Request Body**:
+    ```json
+    {
+      "characterId": 2
+    }
+    ```
+- **Success Response (200 OK)**:
+    ```json
+    {
+      "timestamp": "2026-06-23T10:00:00Z",
+      "status": 200,
+      "data": {
+        "id": "room-uuid-string",
+        "status": "IN_GAME",
+        "host": {
+          "userId": "host-uuid-string",
+          "nickname": "host_user",
+          "characterId": 1,
+          "hp": 20,
+          "cardsInHand": [12, 45, 78, 3, 99],
+          "cardsSubmitted": []
+        },
+        "guest": {
+          "userId": "guest-uuid-string",
+          "nickname": "guest_user",
+          "characterId": 2,
+          "hp": 20,
+          "cardsInHand": [5, 23, 67, 88, 14],
+          "cardsSubmitted": []
+        },
+        "phase": "MOVE",
+        "distance": 3,
+        "currentTurn": 1,
+        "statusEffects": {
+          "host": [],
+          "guest": []
+        }
+      },
+      "error": null
+    }
+    ```
+
+### [POST] /api/game/rooms/{id}/submit
+- **Description**: 현재 페이즈(`MOVE`, `ATTACK`, `DEFENSE`)에서 카드를 제출합니다. 두 플레이어가 모두 카드를 제출하면 자동으로 상태 기계(State Machine)에 따라 다음 페이즈로 전이합니다.
+- **Authentication**: JWT 필수
+- **Path Params**: `id` (방 UUID)
+- **Request Body**:
+    ```json
+    {
+      "cardIds": [12, 45]
+    }
+    ```
+- **Success Response (200 OK)**:
+    ```json
+    {
+      "timestamp": "2026-06-23T10:00:00Z",
+      "status": 200,
+      "data": {
+        "id": "room-uuid-string",
+        "status": "IN_GAME",
+        "host": {
+          "userId": "host-uuid-string",
+          "nickname": "host_user",
+          "characterId": 1,
+          "hp": 20,
+          "cardsInHand": [78, 3, 99],
+          "cardsSubmitted": []
+        },
+        "guest": {
+          "userId": "guest-uuid-string",
+          "nickname": "guest_user",
+          "characterId": 2,
+          "hp": 20,
+          "cardsInHand": [5, 23, 67, 88, 14],
+          "cardsSubmitted": []
+        },
+        "phase": "ATTACK",
+        "distance": 4,
+        "currentTurn": 1,
+        "statusEffects": {
+          "host": [],
+          "guest": []
+        }
+      },
+      "error": null
+    }
+    ```
+
 ## Friends API (P2-08)
 
 > Auth merge 전 임시 처리: current user 식별은 `x-user-id` 헤더를 사용함.
