@@ -264,8 +264,119 @@ sequenceDiagram
     end
 ```
 
-### 6.3 현재 구현 범위
+### 6.3 이벤트 정의 (P4-02~05 구현 완료)
 
-이 이슈(P4-01)는 게이트웨이 연결/인증/로깅만 다룹니다. 방 입장, 카드 제출, 페이즈 브로드캐스트 등 실제 게임 이벤트는 후속 이슈(P4-03~05, wave 3)에서 이 네임스페이스에 `@SubscribeMessage` 핸들러로 추가될 예정입니다 — 이벤트 스펙은 그때 이 섹션에 추가합니다.
+Socket.io 룸 키: `game:{roomId}` (서버 내부 브로드캐스트 채널)
 
-게임 룸/State Machine 데이터 모델(`Character`/`Card`/`MatchHistory` 엔티티, `GameModule`)은 별도 PR([#40](https://github.com/222transcendence/transcendence_backend/pull/40), [#47](https://github.com/222transcendence/transcendence_backend/pull/47))에서 진행 중이며, 두 PR이 동일 파일을 서로 다르게 구현해 충돌 중이라 이 게이트웨이는 의도적으로 그쪽 모듈/엔티티에 의존하지 않게 만들었습니다.
+Redis 세션 키: `game:room:{roomId}` (TTL: 7200s / 게임 종료 시 즉시 삭제)
+
+#### 클라이언트 → 서버
+
+| Event | Payload | Description |
+|---|---|---|
+| `join_room` | `{ roomId: string }` | 소켓 룸 입장. 두 플레이어 모두 입장하면 `game_start` 자동 브로드캐스트 |
+| `leave_room` | `{ roomId: string }` | 소켓 룸 퇴장. 상대방에게 `player_left` 발송 |
+| `submit_cards` | `{ roomId: string, cardIds: number[] }` | 카드 제출. 양쪽 모두 제출 완료 시 페이즈 연산 후 `phase_update` 브로드캐스트 |
+
+#### 서버 → 클라이언트
+
+| Event | Description |
+|---|---|
+| `game_start` | 두 플레이어 소켓 룸 입장 완료 시 브로드캐스트 |
+| `cards_accepted` | 카드 제출 확인 (제출한 클라이언트에게만) |
+| `phase_update` | 페이즈 전환 결과 브로드캐스트 (전체) |
+| `player_left` | 상대방 퇴장 알림 |
+
+#### `game_start` payload
+
+```json
+{
+  "type": "GAME_START",
+  "payload": {
+    "roomId": "uuid",
+    "host": { "userId": "uuid", "nickname": "...", "characterId": 1, "hp": 20, "cardsInHand": [] },
+    "guest": { "userId": "uuid", "nickname": "...", "characterId": 2, "hp": 20, "cardsInHand": [] },
+    "phase": "DRAW",
+    "distance": 3,
+    "currentTurn": 1
+  },
+  "seq": 0
+}
+```
+
+#### `phase_update` payload
+
+```json
+{
+  "type": "PHASE_UPDATE",
+  "payload": {
+    "roomId": "uuid",
+    "status": "IN_GAME",
+    "currentPhase": "ATTACK",
+    "initiative": "host",
+    "distance": 1,
+    "currentTurn": 2,
+    "hostHp": 15,
+    "guestHp": 18,
+    "hostCardsInHand": [1, 3, 7],
+    "guestCardsInHand": [2, 5],
+    "statusEffects": { "host": [], "guest": [{ "type": "POISON", "duration": 1 }] },
+    "diceResults": { "hostAtk": { "count": 3, "successes": 2, "details": [true, true, false] } },
+    "skillsTriggered": ["[SKILL] host의 Shadowstep 발동!"],
+    "winnerId": null
+  },
+  "seq": 0
+}
+```
+
+#### 게임 흐름 시퀀스
+
+```mermaid
+sequenceDiagram
+    participant C1 as Client (Host)
+    participant C2 as Client (Guest)
+    participant G as GameGateway
+    participant S as GameService
+    participant R as Redis
+
+    Note over C1,C2: REST로 방 생성/입장 후 소켓 연결
+    C1->>G: CONNECT /game (JWT)
+    C2->>G: CONNECT /game (JWT)
+    C1->>G: join_room { roomId }
+    C2->>G: join_room { roomId }
+    G->>R: getRoom(roomId)
+    G->>C1: game_start { host, guest, phase: DRAW }
+    G->>C2: game_start { host, guest, phase: DRAW }
+
+    C1->>G: submit_cards { roomId, cardIds: [1,3] }
+    G->>G: cards_accepted → C1
+    C2->>G: submit_cards { roomId, cardIds: [2,5] }
+    G->>S: submitCards(roomId, guestId, [2,5])
+    S->>R: 페이즈 연산 후 저장
+    G->>C1: phase_update { currentPhase: ATTACK, ... }
+    G->>C2: phase_update { currentPhase: ATTACK, ... }
+```
+
+### 6.4 전적 통계 & 리더보드 REST API (P3-08)
+
+게임 종료 시 `MatchHistory`에 기록되며, 아래 REST API로 조회합니다.
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/game/users/:id/stats` | 전적 통계 (wins, losses, winRate, totalGames) |
+| `GET` | `/api/game/users/:id/matches` | 매치 히스토리 목록 (query: `page`, `limit`) |
+| `GET` | `/api/game/leaderboard` | 승률 기준 상위 10명 |
+
+**stats 응답 예시:**
+```json
+{ "data": { "wins": 5, "losses": 3, "totalGames": 8, "winRate": 0.63 } }
+```
+
+**leaderboard 응답 예시:**
+```json
+{
+  "data": [
+    { "id": "uuid", "nickname": "player1", "wins": 10, "losses": 2, "totalGames": 12, "winRate": 0.83 }
+  ]
+}
+```
