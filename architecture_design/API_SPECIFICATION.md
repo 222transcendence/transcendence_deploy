@@ -14,6 +14,24 @@
 
 ## 2. API Endpoint Details (Highlight)
 
+### [POST] /api/users/me/avatar
+- **Description**: 로그인한 사용자의 아바타 이미지를 업로드하고 프로필에 반영.
+- **Auth**: `Authorization: Bearer <token>` 필수 (JwtAuthGuard).
+- **Request**: `multipart/form-data`, 필드명 `avatar` (단일 파일).
+- **허용 형식**: `image/jpeg`, `image/png`, `image/webp`, 최대 2MB.
+- **저장 방식**: 서버 로컬 디스크 (`uploads/avatars/`), 파일명은 UUID로 재생성. `/uploads` 경로로 정적 서빙됨.
+- **Response**: 비밀번호를 제외한 갱신된 User 객체 (`avatar` 필드에 새 URL 포함).
+- **Error Codes**:
+    - `400`: 파일 누락 또는 허용되지 않은 형식/용량 초과
+    - `401`: 인증 토큰 없음/만료
+
+### [GET] /api/v1/matches/{id}/replay
+- **Description**: 종료된 게임의 모든 액션 로그를 리플레이 형식으로 반환.
+- **Query Params**: \`speed\` (Optional), \`turn_range\` (Optional)
+- **Error Codes**:
+    - \`403\`: 권한 없음 (비공개 매치)
+    - \`404\`: 매치 정보 없음
+
 ### Authentication APIs
 
 #### [POST] /api/auth/signup
@@ -274,8 +292,102 @@ All endpoints below are prefixed with `/api/chat` and require **JWT Bearer Token
     }
     \`\`\`
 - **Error Codes**:
-    - \`400\`: 유효성 검사 실패 (닉네임 길이 초과 등)
-    - \`409\`: 닉네임 중복 발생 (\`E_CONFLICT\`)
+    - `400`: 유효성 검사 실패 (닉네임 길이 초과 등)
+    - `409`: 닉네임 중복 발생 (`E_CONFLICT`)
+
+### [POST] /api/auth/signup
+- **Description**: 신규 사용자를 등록함.
+- **Request Body**:
+    ```json
+    {
+      "email": "user@example.com",
+      "nickname": "user_nickname",
+      "password": "user_password"
+    }
+    ```
+- **Success Response (201 Created)**:
+    ```json
+    {
+      "timestamp": "2026-06-09T12:00:00Z",
+      "status": 201,
+      "data": {
+        "id": "uuid-string",
+        "email": "user@example.com",
+        "nickname": "user_nickname",
+        "avatar": "default_avatar.png",
+        "status": "OFFLINE",
+        "wins": 0,
+        "losses": 0,
+        "createdAt": "2026-06-09T12:00:00Z",
+        "updatedAt": "2026-06-09T12:00:00Z"
+      },
+      "error": null
+    }
+    ```
+
+### [POST] /api/auth/login
+- **Description**: 사용자 인증을 진행하고 JWT 토큰을 발급함.
+- **Request Body**:
+    ```json
+    {
+      "email": "user@example.com",
+      "password": "user_password"
+    }
+    ```
+- **Success Response (200 OK)**:
+    ```json
+    {
+      "timestamp": "2026-06-09T12:00:00Z",
+      "status": 200,
+      "data": {
+        "accessToken": "jwt-access-token",
+        "refreshToken": "jwt-refresh-token",
+        "user": {
+          "id": "uuid-string",
+          "email": "user@example.com",
+          "nickname": "user_nickname",
+          "avatar": "default_avatar.png",
+          "status": "ONLINE"
+        }
+      },
+      "error": null
+    }
+    ```
+
+### [POST] /api/auth/refresh
+- **Description**: Refresh 토큰으로 Access 토큰을 갱신함.
+- **Request Body**:
+    ```json
+    {
+      "refreshToken": "jwt-refresh-token"
+    }
+    ```
+- **Success Response (200 OK)**:
+    ```json
+    {
+      "timestamp": "2026-06-09T12:00:00Z",
+      "status": 200,
+      "data": {
+        "accessToken": "new-jwt-access-token"
+      },
+      "error": null
+    }
+    ```
+
+### [POST] /api/auth/logout
+- **Description**: 로그아웃을 진행하고 Refresh 토큰을 만료시킴.
+- **Authentication**: JWT 필수
+- **Success Response (200 OK)**:
+    ```json
+    {
+      "timestamp": "2026-06-09T12:00:00Z",
+      "status": 200,
+      "data": {
+        "success": true
+      },
+      "error": null
+    }
+    ```
 
 #### Rate Limit Rationale & Client Retry Guidance
 
