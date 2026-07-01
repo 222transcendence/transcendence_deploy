@@ -294,8 +294,8 @@ Redis 세션 키: `game:room:{roomId}` (TTL: 7200s / 게임 종료 시 즉시 �
   "type": "GAME_START",
   "payload": {
     "roomId": "uuid",
-    "host": { "userId": "uuid", "nickname": "...", "characterId": 1, "hp": 20, "cardsInHand": [] },
-    "guest": { "userId": "uuid", "nickname": "...", "characterId": 2, "hp": 20, "cardsInHand": [] },
+    "host": { "userId": "uuid", "nickname": "...", "characterId": 1, "hp": 20, "cardsInHand": [1, 5, 12, 33, 7] },
+    "guest": { "userId": "uuid", "nickname": "...", "characterId": 2, "hp": 20, "cardsInHand": [3, 9, 14, 20, 28] },
     "phase": "DRAW",
     "distance": 3,
     "currentTurn": 1
@@ -306,6 +306,8 @@ Redis 세션 키: `game:room:{roomId}` (TTL: 7200s / 게임 종료 시 즉시 �
 
 #### `phase_update` payload
 
+페이즈 전환 및 게임 상태 전체 업데이트.
+
 ```json
 {
   "type": "PHASE_UPDATE",
@@ -314,17 +316,49 @@ Redis 세션 키: `game:room:{roomId}` (TTL: 7200s / 게임 종료 시 즉시 �
     "status": "IN_GAME",
     "currentPhase": "ATTACK",
     "initiative": "host",
-    "distance": 1,
+    "distance": 3,
     "currentTurn": 2,
     "hostHp": 15,
     "guestHp": 18,
-    "hostCardsInHand": [1, 3, 7],
-    "guestCardsInHand": [2, 5],
-    "statusEffects": { "host": [], "guest": [{ "type": "POISON", "duration": 1 }] },
-    "diceResults": { "hostAtk": { "count": 3, "successes": 2, "details": [true, true, false] } },
+    "hostCardsInHand": [5, 12, 33],
+    "guestCardsInHand": [9, 20, 28],
+    "statusEffects": {
+      "host": [],
+      "guest": [{ "type": "POISON", "duration": 2 }]
+    },
+    "diceResults": {
+      "hostAtk": { "count": 3, "successes": 2, "details": [true, true, false] },
+      "guestDef": { "count": 2, "successes": 1, "details": [true, false] }
+    },
     "skillsTriggered": ["[SKILL] host의 Shadowstep 발동!"],
     "winnerId": null
   },
+  "seq": 0
+}
+```
+
+**`phase_update` 필드 설명:**
+- `currentPhase`: 게임 종료 시 `null`
+- `winnerId`: 게임 종료 시 승자 userId, 게임 중에는 `null`
+- `diceResults`: 주사위가 굴려진 페이즈(DEFENSE, RESULT)에서만 값 존재
+- `skillsTriggered`: 트리거된 스킬 로그 문자열 배열
+
+#### `cards_accepted` payload
+
+```json
+{
+  "type": "CARDS_ACCEPTED",
+  "payload": { "roomId": "uuid" },
+  "seq": 0
+}
+```
+
+#### `player_left` payload
+
+```json
+{
+  "type": "PLAYER_LEFT",
+  "payload": { "userId": "uuid", "nickname": "..." },
   "seq": 0
 }
 ```
@@ -380,3 +414,24 @@ sequenceDiagram
   ]
 }
 ```
+
+### 6.5 알려진 미구현 항목
+
+| 항목 | 현재 상태 | 필요 |
+|---|---|---|
+| `TIMER_UPDATE` 이벤트 | 없음 | 서버 30초 타이머 push |
+| 단건 방 GET API | 없음 | 재연결 시 상태 복구용 |
+| 카드 메타데이터 API | 없음 | 카드 타입/값 표시 |
+| `RECONNECT_STATE` 이벤트 | 없음 | 재연결 후 최신 상태 복구 |
+
+### 6.6 프론트엔드 구현 파일
+
+| 파일 | 역할 |
+|---|---|
+| `src/types/game.ts` | RoomStatus, GamePhase, CardType, StatusEffect 타입 |
+| `src/types/gameSocket.ts` | 이벤트 페이로드 타입 + Server/ClientToServerEvents 맵 |
+| `src/context/GameSocketContext.tsx` | 소켓 연결 상태 관리, Provider |
+| `src/hooks/useGameSocket.ts` | roomId별 join/leave + 이벤트 핸들러 구독 |
+| `src/pages/GameBoardPage.tsx` | 게임 보드 페이지, `/game/:roomId` |
+| `src/components/game/CardItem.tsx` | 카드 컴포넌트 (선택/타입 표시) |
+| `src/components/game/HandArea.tsx` | 카드 핸드 + Submit 버튼 영역 |
