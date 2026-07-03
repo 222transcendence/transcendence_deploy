@@ -611,6 +611,81 @@ async function enqueueWithRetry(body) {
     }
     ```
 
+## Game Stats & Match History API (P3-12, feature/21-24-25-26-game-events-stats)
+
+> 아래 엔드포인트는 `feature/21-24-25-26-game-events-stats` 브랜치에 구현됨. dev 머지 전까지 404.
+
+### [GET] /api/game/users/{id}/stats
+- **Authentication**: JWT 필수
+- **Path Params**: `id` (유저 UUID)
+- **Response**:
+  ```json
+  {
+    "timestamp": "...",
+    "status": 200,
+    "data": {
+      "wins": 12,
+      "losses": 5,
+      "totalGames": 17,
+      "winRate": 0.71
+    },
+    "error": null
+  }
+  ```
+- **winRate**: 0~1 소수 (100 곱해서 % 표시)
+
+### [GET] /api/game/users/{id}/matches
+- **Authentication**: JWT 필수
+- **Path Params**: `id` (유저 UUID)
+- **Query Params**: `page` (default 1), `limit` (default 10, max 50)
+- **Response**:
+  ```json
+  {
+    "status": 200,
+    "data": {
+      "matches": [
+        {
+          "id": "match-uuid",
+          "hostUser": { "id": "...", "nickname": "...", "avatar": "..." },
+          "guestUser": { "id": "...", "nickname": "...", "avatar": "..." },
+          "winner": { "id": "...", "nickname": "..." },
+          "turnsPlayed": 8,
+          "createdAt": "2026-06-30T12:00:00Z"
+        }
+      ],
+      "total": 42,
+      "page": 1,
+      "limit": 10
+    },
+    "error": null
+  }
+  ```
+- **winner**: null이면 무승부 (미래 확장 고려)
+
+### [GET] /api/game/leaderboard
+- **Authentication**: JWT 필수
+- **Response** (상위 10명, wins 내림차순):
+  ```json
+  {
+    "status": 200,
+    "data": [
+      {
+        "id": "user-uuid",
+        "nickname": "...",
+        "avatar": "...",
+        "wins": 20,
+        "losses": 3,
+        "totalGames": 23,
+        "winRate": 0.87
+      }
+    ],
+    "error": null
+  }
+  ```
+- wins + losses = 0인 유저는 제외됨
+
+---
+
 ## Friends API (P2-08)
 
 > Auth merge 전 임시 처리: current user 식별은 `x-user-id` 헤더를 사용함.
