@@ -44,6 +44,15 @@ P3-02/P3-03 PR 코드를 직접 확인한 결과, 위 설계 문서가 가정하
 후속 정리는 `transcendence_backend` 신규 이슈([P3-0X] 게임 상태 조회/실시간 푸시 및 액션 디테일
 노출 보강)에서 추적함.
 
+**[2026-07-01 업데이트]** `feature/21-24-25-26-game-events-stats` 브랜치가 위 갭 중 일부를 해결함:
+- `/game` 네임스페이스 Socket.io 게이트웨이 (`/socketio` path) 구현됨
+- `join_room`, `leave_room`, `submit_cards` C2S 이벤트 구현됨
+- `game_start`, `phase_update`, `cards_accepted`, `player_left` S2C 이벤트 구현됨
+- `phase_update`에 `diceResults`, `skillsTriggered`, `winnerId` 포함됨
+- 단건 방 GET API, `TIMER_UPDATE`, 카드 메타데이터 API는 여전히 미구현 (backend#52 추적 중)
+
+이벤트 상세 스펙은 `WEBSOCKET_PROTOCOL.md` §7 참조.
+
 ## 5. Frontend Animation Hooks (P3-11, [#6](https://github.com/222transcendence/transcendence_frontend/issues/6))
 위 백엔드 갭으로 인해 실데이터 연동 없이, 애니메이션 컴포넌트만 먼저 구현함
 (`transcendence_frontend` `feature/6-phase-result-animations` 브랜치, `/dev/phase-animations`
