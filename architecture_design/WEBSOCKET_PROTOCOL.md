@@ -1,7 +1,4 @@
-# Game Sync Protocol & WebSocket Sequence (v3 — 산성비 Acid Rain)
-
-> v3: §6(Game Namespace)을 기존 TCG 카드 듀얼 스키마에서 산성비(실시간 타자 대전) 스키마로 전면
-> 교체. §0(로비)·§5(채팅)는 게임 종류와 무관하여 변경 없음. 상세 배경은 `GAME_DESIGN.md` §0 참고.
+# Game Sync Protocol & WebSocket Sequence (산성비 Acid Rain)
 
 ## 0. Lobby & Room Management Protocol
 `/ws/game/{room_id}` 연결 이전, 로비 화면은 별도 엔드포인트 `/ws/lobby`에 연결하여 방 목록과 입장/대기 상태를 동기화함. 메시지 envelope은 [3. Message Envelope Design](#3-message-envelope-design)과 동일한 `{ type, payload, seq }` 구조를 따름. (백엔드 구현 완료 — `transcendence_backend/src/lobby/` 참고, backend PR #64)
@@ -12,8 +9,8 @@
 ```json
 {
   "id": "room-uuid",
-  "host": { "userId": "uuid", "nickname": "host_nick", "characterId": "magician", "ready": false },
-  "guest": { "userId": "uuid", "nickname": "guest_nick", "characterId": "knight", "ready": false } | null,
+  "host": { "userId": "uuid", "nickname": "host_nick", "ready": false },
+  "guest": { "userId": "uuid", "nickname": "guest_nick", "ready": false } | null,
   "status": "WAITING | IN_GAME",
   "createdAt": "2026-06-22T10:00:00Z"
 }
@@ -23,8 +20,8 @@
 | Type | Payload | Description |
 | :--- | :--- | :--- |
 | `LIST_ROOMS` | `{}` | 현재 방 목록 스냅샷 요청 (연결 시 자동 수신도 됨) |
-| `CREATE_ROOM` | `{ characterId }` | 새 방 생성, 본인이 host가 됨 |
-| `JOIN_ROOM` | `{ roomId, characterId }` | 대기중인 방에 guest로 입장 |
+| `CREATE_ROOM` | `{}` | 새 방 생성, 본인이 host가 됨 |
+| `JOIN_ROOM` | `{ roomId }` | 대기중인 방에 guest로 입장 |
 | `GET_ROOM` | `{ roomId }` | 특정 방의 현재 상태 조회. 인증된 사용자가 이미 host/guest로 등록된 방이면 즉시 `ROOM_UPDATED` 응답 (대기실 페이지 진입/재연결 시 사용) |
 | `LEAVE_ROOM` | `{ roomId }` | 방 퇴장 (host 퇴장 시 방 폭파) |
 | `SET_READY` | `{ roomId, ready }` | 준비 완료/취소 토글 |
@@ -33,7 +30,7 @@
 | Type | Payload | Description |
 | :--- | :--- | :--- |
 | `ROOM_LIST` | `{ rooms: Room[] }` | 전체 방 목록 (연결 시 + 변경 발생 시 broadcast) |
-| `ROOM_UPDATED` | `{ room: Room }` | 특정 방의 상태 변경 (입장/캐릭터 선택/준비 상태) |
+| `ROOM_UPDATED` | `{ room: Room }` | 특정 방의 상태 변경 (입장/준비 상태) |
 | `ROOM_CLOSED` | `{ roomId }` | 방 삭제 (host 퇴장 등) |
 | `GAME_START` | `{ roomId }` | host/guest 모두 ready 시 발송, 클라이언트는 `/ws/game/{roomId}`로 전환 |
 | `ACTION_REJECTED` | `{ message }` | 잘못된 요청(예: 이미 가득 찬 방 입장 시도) |
@@ -47,10 +44,10 @@ sequenceDiagram
 
     C1->>S: CONNECT /ws/lobby
     S->>C1: ROOM_LIST
-    C1->>S: CREATE_ROOM (characterId)
+    C1->>S: CREATE_ROOM ()
     S->>C1: ROOM_UPDATED (room, host set)
     S-->>C2: ROOM_LIST (broadcast)
-    C2->>S: JOIN_ROOM (roomId, characterId)
+    C2->>S: JOIN_ROOM (roomId)
     S->>C1: ROOM_UPDATED (guest joined)
     S->>C2: ROOM_UPDATED (guest joined)
     C1->>S: SET_READY (true)
@@ -269,14 +266,12 @@ sequenceDiagram
 
 ### 6.3 이벤트 정의 — 산성비(Acid Rain) 타자 대전 (설계 확정, 구현 예정)
 
-> 기존 TCG 카드 듀얼(`game_start`/`phase_update`/`submit_cards` 등) 스키마는 폐기되었다. 게임을
-> 산성비(실시간 2인 타자 대전)로 전면 교체하면서 아래 스키마로 재설계했다. 규칙 상세는
-> `GAME_DESIGN.md`를 정본으로 한다.
+규칙 상세는 `GAME_DESIGN.md`를 정본으로 한다.
 
-Socket.io 룸 키: `game:{roomId}` (서버 내부 브로드캐스트 채널, 기존과 동일)
+Socket.io 룸 키: `game:{roomId}` (서버 내부 브로드캐스트 채널)
 
-Redis 세션 키: `game:acidroom:{roomId}` (TTL: **1800s(30분)** — 매치가 최대 180초 + 재접속 유예
-30초로 짧은 실시간 게임 성격에 맞춰 기존 TCG의 7200s에서 축소)
+Redis 세션 키: `game:acidroom:{roomId}` (TTL: **1800s(30분)** — 매치 최대 180초 + 재접속 유예 30초
+기준으로 설정)
 
 서버는 스폰 타이밍/순서와 정오답 판정을 전적으로 결정하는 **권위 서버**다. 클라이언트는 로컬 타이머로
 판정하지 않고, 서버가 보낸 이벤트만 신뢰하며 `now`(서버 시각) 필드로 클록 오차를 보정한다.
@@ -305,7 +300,7 @@ Redis 세션 키: `game:acidroom:{roomId}` (TTL: **1800s(30분)** — 매치가 
 | `match_end` | `{ roomId, winnerId, reason: 'KO' \| 'TIME_LIMIT' \| 'FORFEIT', finalHp: { host, guest } }` | 매치 종료 |
 | `error` | `{ message: string }` | 인증/검증 실패 등 일반 오류 |
 
-`PlayerPublic = { userId, nickname }` — 캐릭터 개념이 완전히 제거되어 `characterId` 필드는 없다.
+`PlayerPublic = { userId, nickname }`.
 
 #### `word_spawn` payload 예시
 
@@ -417,27 +412,22 @@ sequenceDiagram
 
 ### 6.5 구현 상태 (2026-07-19 기준)
 
-산성비 스키마는 **설계 확정, 구현 착수 전** 상태다. 기존 TCG 게이트웨이(`game.gateway.ts` 등)를
-걷어내는 PR과 신규 `AcidRainGateway`/`AcidRainService` PR이 순서대로 진행될 예정이며, 계획은
-팀 플랜 문서(사내 공유) §3/§5를 따른다.
+산성비 스키마는 **설계 확정, 구현 착수 전** 상태다.
 
 | 항목 | 현재 상태 |
 |---|---|
 | `AcidRainGateway`(`/game` 네임스페이스, §6.3 이벤트) | 미구현 (설계만 확정) |
 | `AcidRainService`(스폰 루프, HP/데미지, Redis `game:acidroom:{roomId}`) | 미구현 |
 | `word-bank.ts`(한국어 단어 큐레이션) | 미구현 |
-| 기존 TCG `GameGateway`/`GameService`의 룸 관리 로직(`createRoom`/`joinRoom`/`setReady` 등) | 유지 예정 — 로비가 의존하는 범용 로직이므로 산성비로 전환해도 재사용 |
-| REST 방 엔드포인트(`POST rooms`, `POST rooms/:id/join` 등) | 삭제 예정 (로비가 REST 대신 직접 서비스 호출, 실사용처 없음 확인됨) |
+| 로비의 룸 관리 로직(`createRoom`/`joinRoom`/`setReady` 등) | 유지 — 로비가 의존하는 범용 로직 |
+| REST 방 엔드포인트(`POST rooms`, `POST rooms/:id/join` 등) | 삭제 예정 (실사용처 없음 확인됨) |
 
 ### 6.6 프론트엔드 구현 파일 (계획)
 
 | 파일 | 역할 | 상태 |
 |---|---|---|
-| `src/context/GameSocketContext.tsx` | 소켓 연결/인증 상태 관리, Provider | 유지 (게임 종류 무관 범용 계층) |
-| `src/hooks/useAcidRainSocket.ts` | roomId별 join/leave + §6.3 이벤트 핸들러 구독 | 신규 예정 (기존 `useGameSocket.ts` 대체) |
-| `src/types/acidRain.ts` | §6.3 이벤트 페이로드 타입 + Server/ClientToServerEvents 맵 | 신규 예정 (기존 `gameSocket.ts`/`game.ts`/`gameAnimation.ts` 대체) |
-| `src/pages/GameBoardPage.tsx` | 게임 보드 페이지, `/game/:roomId` — 단어 낙하 렌더링 + 입력창 + HP 바 | 재작성 예정 |
-| `src/pages/GameComingSoonPage.tsx` | TCG 삭제 ~ 신규 게임 UI 완성 사이 배포 공백을 메우는 placeholder | 신규 예정 (임시) |
-
-기존 TCG 전용 파일(`src/types/game.ts`, `gameAnimation.ts`, `src/components/game/*`, `useGameSocket.ts`)은
-삭제 대상이며 재사용하지 않는다.
+| `src/context/GameSocketContext.tsx` | 소켓 연결/인증 상태 관리, Provider | 유지 |
+| `src/hooks/useAcidRainSocket.ts` | roomId별 join/leave + §6.3 이벤트 핸들러 구독 | 신규 |
+| `src/types/acidRain.ts` | §6.3 이벤트 페이로드 타입 + Server/ClientToServerEvents 맵 | 신규 |
+| `src/pages/GameBoardPage.tsx` | 게임 보드 페이지, `/game/:roomId` — 단어 낙하 렌더링 + 입력창 + HP 바 | 재작성 |
+| `src/pages/GameComingSoonPage.tsx` | 배포 공백을 메우는 placeholder | 신규(임시) |
