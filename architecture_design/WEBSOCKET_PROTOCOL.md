@@ -305,6 +305,9 @@ Redis 세션 키: `game:acidroom:{roomId}` (TTL: **1800s(30분)** — 매치 최
 
 - 서버는 방 단위로 `word_submit`을 도착 순서대로 처리한다. 특정 `wordId`가 이미 `cleared`면 이후
   도착하는 모든 제출은 `submit_rejected{reason:'ALREADY_CLEARED'}`.
+  > 이 순서 보장은 **백엔드 인스턴스 1대** 기준이다. Socket.io를 여러 인스턴스로 수평 확장할 경우
+  > Redis adapter로 브로드캐스트해도 같은 방의 두 클라이언트가 서로 다른 인스턴스에 붙어있으면 판정
+  > 순서가 보장되지 않는다 — 확장 시 방 단위 sticky 라우팅 또는 Redis 기반 분산 락이 필요하다.
 - `disconnect` 시 30초 유예: 방 유지 + 상대에게 `opponent_disconnected` 알림. 유예 내 `join_room`
   재전송 시 `state_sync`로 복구, 유예 만료 시 상대 승리(`match_end{reason:'FORFEIT'}`).
 

@@ -9,7 +9,7 @@
 - `password`: String (Hashed, Nullable for OAuth users)
 - `avatar`: String (Default avatar path)
 - `status`: Enum (ONLINE / OFFLINE / IN_GAME)
-- `wins`: Integer (Default 0)
+- `wins`: Integer (Default 0) — 인덱스 권장 (`GET /api/game/leaderboard`가 이 컬럼으로 정렬)
 - `losses`: Integer (Default 0)
 - `createdAt`: Timestamp
 - `updatedAt`: Timestamp
@@ -24,6 +24,9 @@
 - `roundsPlayed`: Integer — 매치당 처리된 단어 수
 - `matchData`: JSONB — `{ finalHp: { host, guest }, wordsTyped: { host, guest }, durationSec }`
 - `createdAt`: Timestamp
+- **인덱스**: `hostUser`, `guestUser` FK 컬럼(전적/매치 목록 조회, `GET /api/game/users/:id/matches`가
+  `hostUser = :id OR guestUser = :id`로 조회함). 리더보드(`GET /api/game/leaderboard`)는
+  `User.wins` 정렬이므로 `users.wins`에도 인덱스 권장.
 
 ## 2. Real-time Session State (Stored in Redis)
 실시간 대전 중인 방의 상태는 고속 처리를 위해 Redis에 임시 보관함. 키: `game:acidroom:{roomId}`,
