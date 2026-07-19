@@ -54,7 +54,7 @@ React 18 + Vite + TypeScript, React Router. 스타일링은 **plain CSS** — `s
 |---|---|---|
 | Acid(그린) | `--accent-acid` | 내 플레이어 HP, 정타 이펙트, 강조 버튼 |
 | Warning(옐로) | `--accent-warning` | 바닥에 가까워진 단어, 남은 시간 경고 |
-| Danger(레드) | `--accent-danger` | 상대 HP 감소, 미스(splash damage) 이펙트 |
+| Danger(레드) | `--accent-danger` | 상대 HP 감소, 미스(splash damage) 이펙트 — `--error`(폼 검증 실패)와 색상이 비슷하니 같은 화면에 함께 쓰지 않는다. `--error`는 로그인/회원가입 등 폼 전용, `--accent-danger`는 게임 화면 전용으로 용도를 분리한다 |
 | 배경 | `--bg-primary` / `--bg-secondary` | 전체 배경 / 패널 배경 |
 | Glass | `--glass-bg` / `--glass-border` | 카드·모달의 유리질감 패널(기존 패턴 유지) |
 
