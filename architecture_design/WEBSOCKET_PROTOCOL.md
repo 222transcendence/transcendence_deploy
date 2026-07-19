@@ -1,4 +1,7 @@
-# Game Sync Protocol & WebSocket Sequence (v2)
+# Game Sync Protocol & WebSocket Sequence (v3 — 산성비 Acid Rain)
+
+> v3: §6(Game Namespace)을 기존 TCG 카드 듀얼 스키마에서 산성비(실시간 타자 대전) 스키마로 전면
+> 교체. §0(로비)·§5(채팅)는 게임 종류와 무관하여 변경 없음. 상세 배경은 `GAME_DESIGN.md` §0 참고.
 
 ## 0. Lobby & Room Management Protocol
 `/ws/game/{room_id}` 연결 이전, 로비 화면은 별도 엔드포인트 `/ws/lobby`에 연결하여 방 목록과 입장/대기 상태를 동기화함. 메시지 envelope은 [3. Message Envelope Design](#3-message-envelope-design)과 동일한 `{ type, payload, seq }` 구조를 따름. (백엔드 구현 완료 — `transcendence_backend/src/lobby/` 참고, backend PR #64)
@@ -264,104 +267,88 @@ sequenceDiagram
     end
 ```
 
-### 6.3 이벤트 정의 (P4-02~05 구현 완료)
+### 6.3 이벤트 정의 — 산성비(Acid Rain) 타자 대전 (설계 확정, 구현 예정)
 
-Socket.io 룸 키: `game:{roomId}` (서버 내부 브로드캐스트 채널)
+> 기존 TCG 카드 듀얼(`game_start`/`phase_update`/`submit_cards` 등) 스키마는 폐기되었다. 게임을
+> 산성비(실시간 2인 타자 대전)로 전면 교체하면서 아래 스키마로 재설계했다. 규칙 상세는
+> `GAME_DESIGN.md`를 정본으로 한다.
 
-Redis 세션 키: `game:room:{roomId}` (TTL: 7200s / 게임 종료 시 즉시 삭제)
+Socket.io 룸 키: `game:{roomId}` (서버 내부 브로드캐스트 채널, 기존과 동일)
+
+Redis 세션 키: `game:acidroom:{roomId}` (TTL: **1800s(30분)** — 매치가 최대 180초 + 재접속 유예
+30초로 짧은 실시간 게임 성격에 맞춰 기존 TCG의 7200s에서 축소)
+
+서버는 스폰 타이밍/순서와 정오답 판정을 전적으로 결정하는 **권위 서버**다. 클라이언트는 로컬 타이머로
+판정하지 않고, 서버가 보낸 이벤트만 신뢰하며 `now`(서버 시각) 필드로 클록 오차를 보정한다.
 
 #### 클라이언트 → 서버
 
 | Event | Payload | Description |
 |---|---|---|
-| `join_room` | `{ roomId: string }` | 소켓 룸 입장. 두 플레이어 모두 입장하면 `game_start` 자동 브로드캐스트 |
-| `leave_room` | `{ roomId: string }` | 소켓 룸 퇴장. 상대방에게 `player_left` 발송 |
-| `submit_cards` | `{ roomId: string, cardIds: number[] }` | 카드 제출. 양쪽 모두 제출 완료 시 페이즈 연산 후 `phase_update` 브로드캐스트 |
+| `join_room` | `{ roomId: string }` | 소켓 룸 입장/재입장. 두 플레이어 모두 입장하면 `match_ready` 브로드캐스트 |
+| `leave_room` | `{ roomId: string }` | 명시적 퇴장 (매치 진행 중이면 몰수패 처리) |
+| `word_submit` | `{ roomId: string, wordId: string, text: string, clientTs: number }` | 단어 입력 제출. `clientTs`는 지연시간 텔레메트리용이며 판정에는 사용하지 않음. 서버는 `wordId`+유저 기준으로 멱등 처리(재전송해도 중복 판정 없음) |
 
 #### 서버 → 클라이언트
 
-| Event | Description |
-|---|---|
-| `game_start` | 두 플레이어 소켓 룸 입장 완료 시 브로드캐스트 |
-| `cards_accepted` | 카드 제출 확인 (제출한 클라이언트에게만) |
-| `phase_update` | 페이즈 전환 결과 브로드캐스트 (전체) |
-| `player_left` | 상대방 퇴장 알림 |
+| Event | Payload | Description |
+|---|---|---|
+| `match_ready` | `{ roomId, protocolVersion, players: { host: PlayerPublic, guest: PlayerPublic } }` | 양쪽 소켓 룸 입장 완료, 카운트다운 시작 신호 |
+| `match_start` | `{ roomId, startAt, now, initialHp }` | 동기화된 매치 시작. `now`(서버 현재 시각)로 클라이언트 클록 오차 보정 |
+| `word_spawn` | `{ wordId, text, tier, fallDurationMs, spawnedAt }` | 양쪽 클라이언트에 동일하게 브로드캐스트되는 단어 스트림 |
+| `word_cleared` | `{ wordId, clearedBy, damage, targetHp: { host, guest } }` | 누군가 먼저 정확히 입력해 단어가 지워짐. 상대방에게 데미지 적용 |
+| `word_missed` | `{ wordId, splashDamage, targetHp: { host, guest } }` | 아무도 못 지운 단어가 바닥에 닿음. 양쪽 모두 데미지 |
+| `submit_rejected` | `{ wordId, reason: 'ALREADY_CLEARED' \| 'NOT_FOUND' \| 'WRONG_TEXT' }` | 제출자에게만 전송(레이스 패배/오타) |
+| `state_sync` | `{ roomId, hp: { host, guest }, activeWords: WordSpawnPayload[], elapsedMs, spawnIntervalMs, now }` | 재접속 시 전체 스냅샷 |
+| `opponent_disconnected` | `{ userId, graceMs: 30000 }` | 상대 연결 끊김, 유예 시작 |
+| `opponent_reconnected` | `{ userId }` | 유예 중 상대 복귀 |
+| `match_end` | `{ roomId, winnerId, reason: 'KO' \| 'TIME_LIMIT' \| 'FORFEIT', finalHp: { host, guest } }` | 매치 종료 |
+| `error` | `{ message: string }` | 인증/검증 실패 등 일반 오류 |
 
-#### `game_start` payload
+`PlayerPublic = { userId, nickname }` — 캐릭터 개념이 완전히 제거되어 `characterId` 필드는 없다.
 
-```json
-{
-  "type": "GAME_START",
-  "payload": {
-    "roomId": "uuid",
-    "host": { "userId": "uuid", "nickname": "...", "characterId": 1, "hp": 20, "cardsInHand": [1, 5, 12, 33, 7] },
-    "guest": { "userId": "uuid", "nickname": "...", "characterId": 2, "hp": 20, "cardsInHand": [3, 9, 14, 20, 28] },
-    "phase": "DRAW",
-    "distance": 3,
-    "currentTurn": 1
-  },
-  "seq": 0
-}
-```
-
-#### `phase_update` payload
-
-페이즈 전환 및 게임 상태 전체 업데이트.
+#### `word_spawn` payload 예시
 
 ```json
 {
-  "type": "PHASE_UPDATE",
-  "payload": {
-    "roomId": "uuid",
-    "status": "IN_GAME",
-    "currentPhase": "ATTACK",
-    "initiative": "host",
-    "distance": 3,
-    "currentTurn": 2,
-    "hostHp": 15,
-    "guestHp": 18,
-    "hostCardsInHand": [5, 12, 33],
-    "guestCardsInHand": [9, 20, 28],
-    "statusEffects": {
-      "host": [],
-      "guest": [{ "type": "POISON", "duration": 2 }]
-    },
-    "diceResults": {
-      "hostAtk": { "count": 3, "successes": 2, "details": [true, true, false] },
-      "guestDef": { "count": 2, "successes": 1, "details": [true, false] }
-    },
-    "skillsTriggered": ["[SKILL] host의 Shadowstep 발동!"],
-    "winnerId": null
-  },
-  "seq": 0
+  "wordId": "w_7f3a",
+  "text": "산성비",
+  "tier": "medium",
+  "fallDurationMs": 4900,
+  "spawnedAt": "2026-07-19T10:00:03.120Z"
 }
 ```
 
-**`phase_update` 필드 설명:**
-- `currentPhase`: 게임 종료 시 `null`
-- `winnerId`: 게임 종료 시 승자 userId, 게임 중에는 `null`
-- `diceResults`: 주사위가 굴려진 페이즈(DEFENSE, RESULT)에서만 값 존재
-- `skillsTriggered`: 트리거된 스킬 로그 문자열 배열
+#### `word_cleared` / `word_missed` payload 예시
 
-#### `cards_accepted` payload
+```json
+{ "wordId": "w_7f3a", "clearedBy": "user-uuid-host", "damage": 8, "targetHp": { "host": 100, "guest": 92 } }
+```
+```json
+{ "wordId": "w_9b21", "splashDamage": 3, "targetHp": { "host": 97, "guest": 89 } }
+```
+
+#### `state_sync` payload 예시 (재접속 복구)
 
 ```json
 {
-  "type": "CARDS_ACCEPTED",
-  "payload": { "roomId": "uuid" },
-  "seq": 0
+  "roomId": "room-uuid",
+  "hp": { "host": 82, "guest": 91 },
+  "activeWords": [
+    { "wordId": "w_c410", "text": "타자", "tier": "easy", "fallDurationMs": 4600, "spawnedAt": "2026-07-19T10:01:10.000Z" }
+  ],
+  "elapsedMs": 47000,
+  "spawnIntervalMs": 1650,
+  "now": "2026-07-19T10:01:12.400Z"
 }
 ```
 
-#### `player_left` payload
+#### 레이스 컨디션 & 재접속 처리
 
-```json
-{
-  "type": "PLAYER_LEFT",
-  "payload": { "userId": "uuid", "nickname": "..." },
-  "seq": 0
-}
-```
+- 서버는 방 단위로 `word_submit`을 도착 순서대로 처리한다. 특정 `wordId`가 이미 `cleared`면 이후
+  도착하는 모든 제출은 `submit_rejected{reason:'ALREADY_CLEARED'}`.
+- `disconnect` 시 30초 유예: 방 유지 + 상대에게 `opponent_disconnected` 알림. 유예 내 `join_room`
+  재전송 시 `state_sync`로 복구, 유예 만료 시 상대 승리(`match_end{reason:'FORFEIT'}`).
 
 #### 게임 흐름 시퀀스
 
@@ -369,26 +356,39 @@ Redis 세션 키: `game:room:{roomId}` (TTL: 7200s / 게임 종료 시 즉시 �
 sequenceDiagram
     participant C1 as Client (Host)
     participant C2 as Client (Guest)
-    participant G as GameGateway
-    participant S as GameService
+    participant G as AcidRainGateway
+    participant S as AcidRainService
     participant R as Redis
 
-    Note over C1,C2: REST로 방 생성/입장 후 소켓 연결
+    Note over C1,C2: 로비에서 GAME_START 핸드오프 후 /game 소켓 연결
     C1->>G: CONNECT /game (JWT)
     C2->>G: CONNECT /game (JWT)
     C1->>G: join_room { roomId }
     C2->>G: join_room { roomId }
     G->>R: getRoom(roomId)
-    G->>C1: game_start { host, guest, phase: DRAW }
-    G->>C2: game_start { host, guest, phase: DRAW }
+    G->>C1: match_ready { players }
+    G->>C2: match_ready { players }
+    G->>C1: match_start { startAt, now, initialHp }
+    G->>C2: match_start { startAt, now, initialHp }
 
-    C1->>G: submit_cards { roomId, cardIds: [1,3] }
-    G->>G: cards_accepted → C1
-    C2->>G: submit_cards { roomId, cardIds: [2,5] }
-    G->>S: submitCards(roomId, guestId, [2,5])
-    S->>R: 페이즈 연산 후 저장
-    G->>C1: phase_update { currentPhase: ATTACK, ... }
-    G->>C2: phase_update { currentPhase: ATTACK, ... }
+    loop 스폰 루프 (서버 타이머)
+        S->>R: 다음 단어 스폰 + 상태 저장
+        G->>C1: word_spawn { wordId, text, ... }
+        G->>C2: word_spawn { wordId, text, ... }
+    end
+
+    C1->>G: word_submit { roomId, wordId, text }
+    G->>S: judge(roomId, userId, wordId, text)
+    S->>R: 상태 갱신 (HP, cleared 표시)
+    G->>C1: word_cleared { wordId, clearedBy: C1, damage, targetHp }
+    G->>C2: word_cleared { wordId, clearedBy: C1, damage, targetHp }
+    C2->>G: word_submit { roomId, wordId, text }
+    G->>C2: submit_rejected { wordId, reason: ALREADY_CLEARED }
+
+    Note over S: HP <= 0 또는 180초 경과 시
+    G->>C1: match_end { winnerId, reason, finalHp }
+    G->>C2: match_end { winnerId, reason, finalHp }
+    S->>R: MatchHistory 저장 후 세션 삭제
 ```
 
 ### 6.4 전적 통계 & 리더보드 REST API (P3-08)
@@ -415,23 +415,29 @@ sequenceDiagram
 }
 ```
 
-### 6.5 알려진 미구현 항목
+### 6.5 구현 상태 (2026-07-19 기준)
 
-| 항목 | 현재 상태 | 필요 |
-|---|---|---|
-| `TIMER_UPDATE` 이벤트 | 없음 | 서버 30초 타이머 push |
-| 단건 방 GET API | 없음 | 재연결 시 상태 복구용 |
-| 카드 메타데이터 API | 없음 | 카드 타입/값 표시 |
-| `RECONNECT_STATE` 이벤트 | 없음 | 재연결 후 최신 상태 복구 |
+산성비 스키마는 **설계 확정, 구현 착수 전** 상태다. 기존 TCG 게이트웨이(`game.gateway.ts` 등)를
+걷어내는 PR과 신규 `AcidRainGateway`/`AcidRainService` PR이 순서대로 진행될 예정이며, 계획은
+팀 플랜 문서(사내 공유) §3/§5를 따른다.
 
-### 6.6 프론트엔드 구현 파일
-
-| 파일 | 역할 |
+| 항목 | 현재 상태 |
 |---|---|
-| `src/types/game.ts` | RoomStatus, GamePhase, CardType, StatusEffect 타입 |
-| `src/types/gameSocket.ts` | 이벤트 페이로드 타입 + Server/ClientToServerEvents 맵 |
-| `src/context/GameSocketContext.tsx` | 소켓 연결 상태 관리, Provider |
-| `src/hooks/useGameSocket.ts` | roomId별 join/leave + 이벤트 핸들러 구독 |
-| `src/pages/GameBoardPage.tsx` | 게임 보드 페이지, `/game/:roomId` |
-| `src/components/game/CardItem.tsx` | 카드 컴포넌트 (선택/타입 표시) |
-| `src/components/game/HandArea.tsx` | 카드 핸드 + Submit 버튼 영역 |
+| `AcidRainGateway`(`/game` 네임스페이스, §6.3 이벤트) | 미구현 (설계만 확정) |
+| `AcidRainService`(스폰 루프, HP/데미지, Redis `game:acidroom:{roomId}`) | 미구현 |
+| `word-bank.ts`(한국어 단어 큐레이션) | 미구현 |
+| 기존 TCG `GameGateway`/`GameService`의 룸 관리 로직(`createRoom`/`joinRoom`/`setReady` 등) | 유지 예정 — 로비가 의존하는 범용 로직이므로 산성비로 전환해도 재사용 |
+| REST 방 엔드포인트(`POST rooms`, `POST rooms/:id/join` 등) | 삭제 예정 (로비가 REST 대신 직접 서비스 호출, 실사용처 없음 확인됨) |
+
+### 6.6 프론트엔드 구현 파일 (계획)
+
+| 파일 | 역할 | 상태 |
+|---|---|---|
+| `src/context/GameSocketContext.tsx` | 소켓 연결/인증 상태 관리, Provider | 유지 (게임 종류 무관 범용 계층) |
+| `src/hooks/useAcidRainSocket.ts` | roomId별 join/leave + §6.3 이벤트 핸들러 구독 | 신규 예정 (기존 `useGameSocket.ts` 대체) |
+| `src/types/acidRain.ts` | §6.3 이벤트 페이로드 타입 + Server/ClientToServerEvents 맵 | 신규 예정 (기존 `gameSocket.ts`/`game.ts`/`gameAnimation.ts` 대체) |
+| `src/pages/GameBoardPage.tsx` | 게임 보드 페이지, `/game/:roomId` — 단어 낙하 렌더링 + 입력창 + HP 바 | 재작성 예정 |
+| `src/pages/GameComingSoonPage.tsx` | TCG 삭제 ~ 신규 게임 UI 완성 사이 배포 공백을 메우는 placeholder | 신규 예정 (임시) |
+
+기존 TCG 전용 파일(`src/types/game.ts`, `gameAnimation.ts`, `src/components/game/*`, `useGameSocket.ts`)은
+삭제 대상이며 재사용하지 않는다.

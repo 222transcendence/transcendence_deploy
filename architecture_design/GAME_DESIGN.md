@@ -1,72 +1,101 @@
-# Game System & Phase Design
+# Game Design — 산성비 (Acid Rain Typing Battle)
 
-## 1. Battle Phase State Machine
-배틀은 엄격한 순차적 페이즈로 관리되며, 모든 플레이어의 액션이 완료되어야 다음 페이즈로 전이됨.
+## 0. 배경
 
-| Phase | Description | Sync Actions |
-| :--- | :--- | :--- |
-| **DRAW** | 각 플레이어에게 카드 지급 (최대 5장) | `CARDS_DRAWN` |
-| **MOVE** | 이동 카드 제출 및 거리 계산, 선공 결정 | `MOVE_SUBMITTED`, `DISTANCE_CHANGED` |
-| **ATTACK** | 공격 카드 제출 및 필살기 트리거 체크 | `ATTACK_DECLARED` |
-| **DEFENSE** | 방어 카드 제출 및 주사위 연산 | `DEFENSE_SUBMITTED` |
-| **RESULT** | 데미지 적용 및 상태이상 턴 감소 | `DAMAGE_APPLIED`, `TURN_END` |
+기존에는 TCG 카드 듀얼(DRAW→MOVE→ATTACK→DEFENSE→RESULT 페이즈, 주사위, 스킬)을 설계·구현하고 있었으나,
+팀 논의 끝에 **실시간 2인 타자 대전("산성비")**으로 게임을 전면 교체하기로 결정했다. 이전 TCG 설계 문서는
+`게임 기능 명세서/archive/`에 참고용으로 보존되어 있다.
 
-## 2. Core Mechanics
-### 2.1. Dice Engine (The "33.3%" Rule)
-- **Logic**: 모든 주사위는 독립 시행.
-- **Formula**: `DiceCount = (Base Stat + Card Values + Skill Buffs)`
-- **Success**: 주사위 1개당 1/3(약 33.3%) 확률로 앞면 판정. 서버 로직에서 `random.randint(1, 3) == 1`로 처리.
+과제(ft_transcendence subject v20.0) 기준으로도 Pong은 예시일 뿐이며, "실시간으로 여러 유저가 동시에
+상호작용하는 웹 게임"이면 `Gaming and user experience`(Major) · `Remote players`(Major) 요건을 그대로
+충족하므로 게임 종류 교체 자체는 과제 요건에 영향을 주지 않는다.
 
-### 2.2. Initiative (선공권)
-- 이동 페이즈에서 제출된 이동 카드의 합계가 높은 플레이어가 획득.
-- 합계가 같을 경우 50% 확률로 서버가 결정.
+## 1. 게임 개요
 
-### 2.3. Status Effects (상태이상)
-- **Stacking**: 중복 적용 시 리스트 형태로 관리.
-- **Processing**: 이동 페이즈 종료 후(독, 재생 등) 또는 결과 페이즈 종료 후(자괴 등) 연산 수행.
+- **인원**: 1:1 실시간 대전.
+- **핵심 루프**: 서버가 단어를 생성해 양쪽 클라이언트에 **동일한 단어 스트림**을 동시에 브로드캐스트한다.
+  화면 위에서 단어가 떨어지고, 먼저 정확히 입력한 플레이어가 그 단어를 지우며 상대방에게 데미지를 준다.
+  아무도 지우지 못한 단어가 바닥에 닿으면 산성비를 맞은 것처럼 **양쪽 모두** 데미지를 입는다.
+- **승패**: 상대 HP를 0 이하로 만들거나, 매치 종료 시점(180초)에 더 높은 HP를 보유하면 승리.
+- **서버 권위**: 단어 스폰 시각/순서, 정오답 판정, 데미지 계산은 전부 서버가 결정한다. 클라이언트는
+  서버가 보낸 이벤트를 그리기만 하며, 클라이언트 로컬 타이머로 판정하지 않는다(레이턴시 조작 방지).
 
-## 3. Skill System (Trigger-Action)
-- **Trigger**: 특정 페이즈 + 특정 카드 조합 (예: 근거리 공격 + 특수 2장).
-- **Action**: 공격력 가산, 카드 파괴, 상태이상 부여 등.
+## 2. State Machine
 
-## 4. 현재 backend 구현(`feat/P3-02-P3-03-game-engine`, in review)과의 차이
-P3-02/P3-03 PR 코드를 직접 확인한 결과, 위 설계 문서가 가정하는 실시간 sync action(`CARDS_DRAWN`,
-`MOVE_SUBMITTED`, `DISTANCE_CHANGED`, `ATTACK_DECLARED`, `DEFENSE_SUBMITTED`, `DAMAGE_APPLIED`,
-`TURN_END` 등)은 아직 구현되어 있지 않음. 실제로는:
-- WebSocket/Socket.io 게이트웨이 없이 **순수 REST + Redis** 구조 (`POST /game/rooms`,
-  `/game/rooms/:id/join`, `/game/rooms/:id/submit`, `GET /game/rooms`만 존재).
-- 방 단건 상태를 조회하는 GET 엔드포인트가 없어, 상대방이 카드를 제출했는지/페이즈가 바뀌었는지
-  알 수 있는 방법이 클라이언트에 없음.
-- `submitCards` 응답에 최종 HP만 반영되고, 주사위 성공 횟수·데미지 분해·스킬 발동 여부 등
-  애니메이션에 필요한 중간 연산 값이 노출되지 않음.
-- `Character.skills` 필드는 엔티티에 존재하지만 트리거 로직(`Skill System`)은 아직 미구현.
+```
+WAITING → COUNTDOWN → IN_PROGRESS → FINISHED
+```
 
-후속 정리는 `transcendence_backend` 신규 이슈([P3-0X] 게임 상태 조회/실시간 푸시 및 액션 디테일
-노출 보강)에서 추적함.
+| Phase | 설명 | 트리거 |
+|---|---|---|
+| `WAITING` | 로비에서 두 플레이어가 방에 입장, `SET_READY`로 준비 완료 대기 | 로비 프로토콜(`WEBSOCKET_PROTOCOL.md` §0)에서 처리, `/game` 네임스페이스 진입 전 |
+| `COUNTDOWN` | `match_ready` → `match_start`(동기화된 시작 시각) 사이의 짧은 카운트다운 | 양쪽 소켓이 `join_room` 완료 |
+| `IN_PROGRESS` | 단어 스폰 루프 동작, HP 변동, 재접속 처리 | `match_start` 이후 |
+| `FINISHED` | HP 0 도달 / 180초 경과 / 상대 퇴장(FORFEIT) | `match_end` 브로드캐스트, `MatchHistory` 저장 |
 
-**[2026-07-01 업데이트]** `feature/21-24-25-26-game-events-stats` 브랜치가 위 갭 중 일부를 해결함:
-- `/game` 네임스페이스 Socket.io 게이트웨이 (`/socketio` path) 구현됨
-- `join_room`, `leave_room`, `submit_cards` C2S 이벤트 구현됨
-- `game_start`, `phase_update`, `cards_accepted`, `player_left` S2C 이벤트 구현됨
-- `phase_update`에 `diceResults`, `skillsTriggered`, `winnerId` 포함됨
-- 단건 방 GET API, `TIMER_UPDATE`, 카드 메타데이터 API는 여전히 미구현 (backend#52 추적 중)
+## 3. 핵심 메커닉 (MVP 확정 수치)
 
-이벤트 상세 스펙은 `WEBSOCKET_PROTOCOL.md` §7 참조.
+### 3.1 HP & 매치 종료
+- 양쪽 HP 초기값 `100`.
+- `HP <= 0` → 즉시 종료(`KO`).
+- 매치 상한 `180초` → 도달 시 HP 높은 쪽 승리, 동률이면 무승부(`TIME_LIMIT`).
 
-## 5. Frontend Animation Hooks (P3-11, [#6](https://github.com/222transcendence/transcendence_frontend/issues/6))
-위 백엔드 갭으로 인해 실데이터 연동 없이, 애니메이션 컴포넌트만 먼저 구현함
-(`transcendence_frontend` `feature/6-phase-result-animations` 브랜치, `/dev/phase-animations`
-데모 라우트 — 실제 게임 페이지(`/game/:roomId`, [#5](https://github.com/222transcendence/transcendence_frontend/issues/5))에는
-아직 연결되지 않음).
+### 3.2 단어 은행
+- `src/game/acid-rain/word-bank.ts`에 정적 배열로 관리되는 **한국어 큐레이션 단어 300~500개**.
+- 길이 기준 3티어: `easy`(2~3자) / `medium`(4~5자) / `hard`(6자 이상).
 
-| 컴포넌트 | 위치 | Props |
-| :--- | :--- | :--- |
-| `PhaseBanner` | `src/components/game/PhaseBanner.tsx` | `phase: GamePhase` |
-| `DiceRollAnimation` | `src/components/game/DiceRollAnimation.tsx` | `result: DiceRollResult`, `onComplete?` |
-| `DamageFloatingNumber` | `src/components/game/DamageFloatingNumber.tsx` | `popup: DamagePopup`, `onDone` |
-| `SkillEffectOverlay` | `src/components/game/SkillEffectOverlay.tsx` | `trigger: SkillEffectTrigger`, `onDone` |
-| `GameEndModal` | `src/components/game/GameEndModal.tsx` | `summary: MatchSummary`, `isWinner`, `onRematch`, `onBackToLobby` |
+### 3.3 스폰 간격 (난이도 램프)
+```
+interval(ms) = max(700, 2000 - 50 * floor(elapsedSec / 10))
+```
+시작 2000ms에서 10초마다 50ms씩 빨라지며 700ms에서 바닥을 친다.
 
-타입은 `src/types/gameAnimation.ts`에 정의. `DiceRollResult.success`, `DamagePopup.amount`,
-`SkillEffectTrigger`는 현재 backend 응답에 없는 값이라 #5 게임 보드 UI와 백엔드 갭 이슈가
-해결된 뒤, 실제 응답 필드로 매핑하는 작업이 별도로 필요함.
+### 3.4 티어 가중치 (경과 시간별)
+| 경과 시간 | 출제 티어 |
+|---|---|
+| 0~30초 | easy만 |
+| 30~90초 | easy + medium |
+| 90초~ | easy/medium/hard = 40/35/25 가중치 |
+
+### 3.5 낙하 시간
+```
+fallDurationMs = (4000 + 300 * wordLength) * max(0.6, 1 - elapsedSec / 300)
+```
+단어 길이에 비례해 기본 시간을 주되, 경과 시간이 늘수록 전체적으로 빨라진다.
+
+### 3.6 데미지
+- **정타(단어를 먼저 지움)**: 상대에게 `5 + wordLength` 데미지. 지워진 단어는 양쪽 클라이언트에서 즉시 제거.
+- **미스(단어가 바닥에 닿음)**: 양쪽 모두 고정 `3` 데미지("산성비를 함께 맞는다" 컨셉 — 못 막은 실패는 공유).
+
+### 3.7 동시입력(레이스 컨디션) 처리
+- 서버는 방마다 `word_submit`을 도착 순서대로 처리한다(Socket.io 룸 단위 단일 처리).
+- 특정 `wordId`가 이미 `cleared` 상태면, 이후 도착하는 모든 제출은 `submit_rejected{reason:'ALREADY_CLEARED'}`.
+- 같은 유저가 같은 단어를 재전송(네트워크 재시도 등)해도 서버가 멱등 처리하여 중복 판정하지 않는다.
+
+### 3.8 재접속
+- `disconnect` 시 **30초 유예**. 방은 유지되고 상대에게 `opponent_disconnected{graceMs:30000}` 알림.
+- 유예 내 재접속: 클라이언트가 동일 `roomId`로 `join_room` 재전송 → 서버가 `state_sync`로 현재 HP,
+  낙하 중인 단어 목록(남은 시간 포함), 경과 시간, 스폰 간격, **서버 현재 시각**을 스냅샷으로 전송.
+- 유예 만료: 상대방 승리 처리(`match_end{reason:'FORFEIT'}`).
+
+### 3.9 매치 종료 시 저장
+- 기존 `MatchHistory` 엔티티를 그대로 재사용(TCG 전용이 아닌 범용 승부 기록 테이블).
+- `matchData` jsonb: `{ finalHp: { host, guest }, wordsTyped: { host, guest }, durationSec }`.
+
+## 4. WebSocket 이벤트 스키마
+
+전체 이벤트 정의(payload 상세)는 `WEBSOCKET_PROTOCOL.md` §6을 정본으로 한다. 이 문서는 게임 규칙만
+다루고, 프로토콜 세부사항은 중복 기술하지 않는다.
+
+## 5. 캐릭터 개념 없음
+
+기존 TCG의 캐릭터(마법사/전사/도적) 시스템은 완전히 제거되었다. 산성비 대전은 닉네임만으로 진행되며,
+`characterId` 관련 로직/DTO/UI(`CharacterSelectModal` 등)는 삭제 대상이다.
+
+## 6. 향후 확장 여지 (과제 모듈 매핑)
+
+- **AI 모듈(Major)**: AI가 사람 대신 단어를 입력하는 상대로 구현 가능 — 반응 지연에 랜덤성을 부여해
+  "완벽하지 않은" 사람다운 플레이를 시뮬레이션.
+- **Multiplayer game (3인 이상, Major)**: 동일 단어 스트림을 3인 이상에게 동시에 뿌리는 방식으로 확장 가능.
+- **Tournament(Minor)**: 매치 자체가 짧고(최대 180초) 승패가 명확해 토너먼트 브래킷에 적합.
+- **Game customization(Minor)**: 난이도 파라미터(스폰 간격, HP, 데미지 배율)를 방 생성 시 옵션화 가능.
