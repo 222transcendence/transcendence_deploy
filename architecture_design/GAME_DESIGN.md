@@ -1,14 +1,7 @@
 # Game Design — 산성비 (Acid Rain Typing Battle)
 
-## 0. 배경
-
-기존에는 TCG 카드 듀얼(DRAW→MOVE→ATTACK→DEFENSE→RESULT 페이즈, 주사위, 스킬)을 설계·구현하고 있었으나,
-팀 논의 끝에 **실시간 2인 타자 대전("산성비")**으로 게임을 전면 교체하기로 결정했다. 이전 TCG 설계 문서는
-`게임 기능 명세서/archive/`에 참고용으로 보존되어 있다.
-
-과제(ft_transcendence subject v20.0) 기준으로도 Pong은 예시일 뿐이며, "실시간으로 여러 유저가 동시에
-상호작용하는 웹 게임"이면 `Gaming and user experience`(Major) · `Remote players`(Major) 요건을 그대로
-충족하므로 게임 종류 교체 자체는 과제 요건에 영향을 주지 않는다.
+과제(ft_transcendence subject v20.0) 기준으로 "실시간으로 여러 유저가 동시에 상호작용하는 웹 게임"이면
+`Gaming and user experience`(Major) · `Remote players`(Major) 요건을 충족한다.
 
 ## 1. 게임 개요
 
@@ -79,7 +72,7 @@ fallDurationMs = (4000 + 300 * wordLength) * max(0.6, 1 - elapsedSec / 300)
 - 유예 만료: 상대방 승리 처리(`match_end{reason:'FORFEIT'}`).
 
 ### 3.9 매치 종료 시 저장
-- 기존 `MatchHistory` 엔티티를 그대로 재사용(TCG 전용이 아닌 범용 승부 기록 테이블).
+- `MatchHistory` 엔티티에 저장.
 - `matchData` jsonb: `{ finalHp: { host, guest }, wordsTyped: { host, guest }, durationSec }`.
 
 ## 4. WebSocket 이벤트 스키마
@@ -89,8 +82,7 @@ fallDurationMs = (4000 + 300 * wordLength) * max(0.6, 1 - elapsedSec / 300)
 
 ## 5. 캐릭터 개념 없음
 
-기존 TCG의 캐릭터(마법사/전사/도적) 시스템은 완전히 제거되었다. 산성비 대전은 닉네임만으로 진행되며,
-`characterId` 관련 로직/DTO/UI(`CharacterSelectModal` 등)는 삭제 대상이다.
+산성비 대전은 캐릭터 없이 닉네임만으로 진행된다.
 
 ## 6. 향후 확장 여지 (과제 모듈 매핑)
 

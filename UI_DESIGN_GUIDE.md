@@ -1,9 +1,7 @@
 # Frontend UI Design Guide — Transcendence (산성비 Acid Rain)
 
-이 문서는 기존 TCG(카드 듀얼) 기준으로 작성된 Tailwind + shadcn/ui + Radix 스택 가이드를 대체한다.
-그 가이드는 실제로 `transcendence_frontend`에 도입된 적이 없는 아스피레이셔널 문서였다 —
-실제 스택은 지금도 **플레인 CSS + `:root` 커스텀 프로퍼티**(`src/index.css`)이며, 게임을 산성비로
-교체하는 이번 전면 리디자인에서도 이 방식을 그대로 진화시킨다.
+`transcendence_frontend`의 실제 스택은 **플레인 CSS + `:root` 커스텀 프로퍼티**(`src/index.css`)이며,
+이번 전면 리디자인에서도 이 방식을 그대로 진화시킨다.
 
 ## 0. 왜 Tailwind/shadcn을 새로 들이지 않는가
 
@@ -20,8 +18,8 @@ React 18 + Vite + TypeScript, React Router. 스타일링은 **plain CSS** — `s
 
 ## 2. 디자인 토큰
 
-기존 `:root`(`src/index.css`)의 TCG용 팔레트(`--accent-cyan`, `--accent-purple`, `--accent-neon`)를
-산성비 컨셉("산성비가 내리는 밤" — 형광 라임/그린 계열 산성비 + 경고색 대비)으로 교체한다.
+`:root`(`src/index.css`) 팔레트를 산성비 컨셉("산성비가 내리는 밤" — 형광 라임/그린 계열 산성비 +
+경고색 대비)으로 정의한다.
 
 ```css
 :root {
@@ -74,7 +72,7 @@ React 18 + Vite + TypeScript, React Router. 스타일링은 **plain CSS** — `s
 | Input | `.input` | 텍스트 입력 — 로그인, 단어 입력창 공용 |
 | Modal | `.modal-overlay` / `.modal` | 매치 종료, 확인 다이얼로그 |
 | Badge | `.badge`, `.badge-status` | 상태 표시(온라인/대기중/게임중 등) |
-| HP Bar | `.hp-bar`, `.hp-bar-fill` | 산성비 대전 체력바 (기존 TCG `StatBar` 대체) |
+| HP Bar | `.hp-bar`, `.hp-bar-fill` | 산성비 대전 체력바 |
 
 각 프리미티브는 variant를 modifier 클래스로 표현한다(`.btn-primary`, `.btn-ghost` 등). 컴포넌트별
 전용 클래스가 필요하면 `{page}-{element}` 네이밍(`lobby-room-card`, `waiting-ready-toggle` 등 기존
@@ -100,11 +98,9 @@ React 18 + Vite + TypeScript, React Router. 스타일링은 **plain CSS** — `s
 
 - `LoginPage` / `SignupPage` / `OAuthCallbackPage` — Card + Input + Button 프리미티브로 정리.
 - `HomePage`, `ProfilePage`, `StatsPage`, `LeaderboardPage` — Card + Badge 위주, 로직 변경 없음.
-- `LobbyPage` / `WaitingRoomPage` — Card(RoomCard) + Badge(상태), 캐릭터 선택 UI(`CharacterSelectModal`)
-  는 캐릭터 개념 제거에 따라 삭제.
-- `GameBoardPage`(신규 산성비 화면) — 낙하하는 단어(DOM 또는 Canvas), 입력창(Input), 양쪽 HP Bar,
-  매치 종료 Modal. TCG 전용 컴포넌트(`PhaseBanner`, `HandArea`, `CardItem`, `DiceRollAnimation`,
-  `SkillEffectOverlay`)는 전부 삭제하고 이 화면 전용 컴포넌트를 새로 만든다.
+- `LobbyPage` / `WaitingRoomPage` — Card(RoomCard) + Badge(상태). 캐릭터 선택 UI는 없음.
+- `GameBoardPage`(산성비 화면) — 낙하하는 단어(DOM 또는 Canvas), 입력창(Input), 양쪽 HP Bar,
+  매치 종료 Modal로 새로 구성한다.
 - `PrivacyPolicyPage` / `TermsOfServicePage` — 스타일 변경 최소, 콘텐츠는 그대로.
 
 ## 6. WebSocket 이벤트 ↔ UI 연동
