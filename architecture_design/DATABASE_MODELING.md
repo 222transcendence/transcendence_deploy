@@ -35,7 +35,6 @@ erDiagram
         bigint id PK
         int match_id FK
         int turn_number
-        enum phase "MOVE, ATTACK, DEFENSE"
         jsonb action_data "Optimized JSON storage"
     }
     %% 구현 노트(#14): 실제 구현은 위 두 엔티티를 분리하지 않고, MatchHistory.id를 uuid PK로

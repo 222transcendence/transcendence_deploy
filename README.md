@@ -1,14 +1,21 @@
-# Transcendence: Tactical Card Duel
+# Transcendence: 산성비 (Acid Rain) Real-time Typing Battle
 
 *This project has been created as part of the 42 curriculum by hisong, jahong, jishin, kyouhele, yuhyoon.*
 
 ## 1. Description
-**Transcendence**는 TCG '언라이트'를 레퍼런스로 한 턴제 덱 기반 듀얼(TCG Duel) 게임입니다. 플레이어는 전사·마법사·도적 중 한 직업의 덱을 구성하여, 드로우·이동·공격·방어의 페이즈를 통해 전략적 전투를 진행합니다. 카드 제출, 주사위 판정, 상태이상 시스템을 활용해 전투를 운영하며, 턴 제한과 판정승 규칙 등으로 승패가 결정됩니다.
+**Transcendence**는 실시간 2인 타자 대전 게임 **산성비(Acid Rain)**입니다. 서버가 동일한 단어 스트림을
+양쪽 플레이어에게 동시에 브로드캐스트하면, 화면 위에서 단어가 떨어지고 먼저 정확히 입력한 플레이어가
+그 단어를 지우며 상대에게 데미지를 줍니다. 아무도 지우지 못한 단어가 바닥에 닿으면 양쪽 모두 데미지를
+입습니다. 서버가 스폰 타이밍/순서와 판정을 전적으로 결정하는 권위 서버(authoritative server) 구조로,
+상대 HP를 먼저 0으로 만들거나 제한 시간(180초) 내 더 높은 HP를 유지하면 승리합니다.
+
+> 상세 규칙은 `architecture_design/GAME_DESIGN.md`, 이벤트 스키마는
+> `architecture_design/WEBSOCKET_PROTOCOL.md` §6 참고.
 
 ### Key Features
-- **Turn-based Duel System**: 드로우·이동·공격·방어 페이즈로 구성된 턴제 카드 전투.
-- **Deck & Card Mechanics**: 덱 구성, 액션 카드(이동/방어/근·중·원거리 공격/특수)와 슬롯 관리.
-- **AI Opponent**: 카드 기반 전략을 수행하는 AI 대전.
+- **Real-time Typing Battle**: 서버 권위 기반으로 동기화된 단어 스폰 스트림과 정오답 판정.
+- **Remote Players**: 서로 다른 컴퓨터의 두 플레이어가 실시간으로 대전, 재접속 유예/복구 지원.
+- **AI Opponent**: 사람처럼 지연을 갖고 반응하는 AI 대전 (예정).
 - **Social Interaction**: 채팅 및 친구 시스템을 통한 사용자 상호작용.
 - **DevOps Monitoring**: Prometheus와 Grafana를 이용한 시스템 상태 시각화.
 
@@ -53,10 +60,12 @@
 ---
 
 ## 5. Database Schema
-- **Users**: id, nickname, email, status, avatar
-- **Games**: id, player1_id, player2_id, score, winner_id, played_at
+- **Users**: id, nickname, email, password, avatar, status, wins, losses
+- **MatchHistory**: id, hostUser, guestUser, winner, roundsPlayed, matchData(jsonb), createdAt
 - **ChatMessages**: id, sender_id, room_id, content, created_at
-- **Friends**: id, user_id, friend_id, status
+- **Friends**: id, requesterId, receiverId, status
+
+전체 스키마 상세는 `architecture_design/DATABASE_DESIGN.md` 참고.
 
 ---
 
