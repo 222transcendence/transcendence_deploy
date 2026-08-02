@@ -61,7 +61,7 @@
 
 ## 5. Database Schema
 - **Users**: id, nickname, email, password, avatar, status, wins, losses
-- **MatchHistory**: id, hostUser, guestUser, winner, turnsPlayed, matchData(jsonb), createdAt
+- **MatchHistory**: id, hostUser, guestUser, winner, roundsPlayed, matchData(jsonb), createdAt
 - **ChatMessages**: id, sender_id, room_id, content, created_at
 - **Friends**: id, requesterId, receiverId, status
 
