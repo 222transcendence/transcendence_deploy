@@ -338,7 +338,7 @@ sequenceDiagram
         G->>C2: word_spawn { wordId, text, ... }
     end
 
-    C1->>G: word_submit { roomId, wordId, text }
+    C1->>G: word_submit { roomId, wordId, text, clientTs }
     G->>S: judge(roomId, userId, wordId, text)
     S->>R: 상태 갱신 (HP, cleared 표시)
     G->>C1: word_cleared { wordId, clearedBy: C1, damage, targetHp }
