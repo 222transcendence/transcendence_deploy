@@ -59,7 +59,7 @@ WHERE id NOT IN (
 
 ## ADR 001: Web-Authoritative Game Engine & Django Channels
 * **Status**: Accepted
-* **Context**: 실시간 TCG 게임의 공정성을 위해 클라이언트 조작을 방지해야 하며, 42 프로젝트의 기술적 제약을 충족해야 함.
+* **Context**: 실시간 게임의 공정성을 위해 클라이언트 조작을 방지해야 하며, 42 프로젝트의 기술적 제약을 충족해야 함.
 * **Decision**: 모든 게임 로직 연산을 서버에서 수행하는 Authoritative Server 패턴을 채택하고, Django Channels를 통해 실시간 상태를 브로드캐스트함.
 * **Consequences**:
     - **장점**: 클라이언트 핵(Hack) 원천 봉쇄, 단일 진실 공급원(SSOT) 확보.
@@ -75,7 +75,7 @@ WHERE id NOT IN (
 
 ## ADR 003: Redis-based Game State Caching
 * **Status**: Accepted
-* **Context**: 주사위 연산 및 카드 제출 등 빈번한 데이터 쓰기 발생 시 PostgreSQL의 I/O 병목 우려.
+* **Context**: 단어 스폰/판정, HP 갱신 등 빈번한 데이터 쓰기 발생 시 PostgreSQL의 I/O 병목 우려.
 * **Decision**: 진행 중인 게임 세션의 휘발성 데이터는 Redis에 보관하고, 최종 결과만 PostgreSQL에 기록.
 * **Consequences**:
     - **장점**: 초당 수만 건의 게임 액션 처리 가능.
