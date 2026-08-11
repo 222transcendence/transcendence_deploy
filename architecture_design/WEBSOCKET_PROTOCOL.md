@@ -253,7 +253,7 @@ Redis 세션 키: `game:acidroom:{roomId}` (TTL: **1800s(30분)** — 매치 최
 |---|---|---|
 | `match_ready` | `{ roomId, protocolVersion, players: { host: PlayerPublic, guest: PlayerPublic } }` | 양쪽 소켓 룸 입장 완료, 카운트다운 시작 신호 |
 | `match_start` | `{ roomId, startAt, now, initialHp }` | 동기화된 매치 시작. `now`(서버 현재 시각)로 클라이언트 클록 오차 보정 |
-| `word_spawn` | `{ wordId, text, tier, lane, fallDurationMs, spawnedAt }` | 양쪽 클라이언트에 동일하게 브로드캐스트되는 단어 스트림. `lane`은 서버가 결정하는 가로 슬롯 인덱스(정수)로, 두 클라이언트가 같은 단어를 항상 같은 위치에서 렌더링하도록 보장한다 |
+| `word_spawn` | `{ wordId, text, keystrokes, lane, fallDurationMs, spawnedAt }` | 양쪽 클라이언트에 동일하게 브로드캐스트되는 단어 스트림. `keystrokes`는 2벌식 기준 실제 타건 횟수(`word-bank.ts`의 `WordEntry.keystrokes`, §3.2 참고) — 낙하 시간·데미지 계산에 쓰이므로 클라이언트도 함께 받는다. `lane`은 서버가 결정하는 가로 슬롯 인덱스(정수)로, 두 클라이언트가 같은 단어를 항상 같은 위치에서 렌더링하도록 보장한다 |
 | `word_cleared` | `{ wordId, clearedBy, damage, targetHp: { host, guest } }` | 누군가 먼저 정확히 입력해 단어가 지워짐. 상대방에게 데미지 적용 |
 | `word_missed` | `{ wordId, splashDamage, targetHp: { host, guest } }` | 아무도 못 지운 단어가 바닥에 닿음. 양쪽 모두 데미지 |
 | `submit_rejected` | `{ wordId, reason: 'ALREADY_CLEARED' \| 'NOT_FOUND' \| 'WRONG_TEXT' }` | 제출자에게만 전송(레이스 패배/오타) |
@@ -288,13 +288,20 @@ Redis 세션 키: `game:acidroom:{roomId}` (TTL: **1800s(30분)** — 매치 최
 - `match_ready`/`match_start`/`word_cleared`/`word_missed`/`state_sync`의 필드명은 본 문서(§6.3)
   표와 아래 예시가 유일한 정본이다.
 
+#### 추가 갱신 (2026-08-11) — `tier` → `keystrokes`
+
+`word-bank.ts`(`#73`, PR #86) 구현 과정에서 단어 난이도를 음절 수 기반 3티어(easy/medium/hard)
+대신 **2벌식 키보드 실제 타건 횟수**(`keystrokes: number`)로 재정의했다. `word_spawn`/`state_sync`의
+`tier` 필드는 `keystrokes`로 교체됐다 — 상세 근거와 낙하 시간·데미지 계산식은 `GAME_DESIGN.md`
+§3.2/§3.4~3.6 참고 (`#87`).
+
 #### `word_spawn` payload 예시
 
 ```json
 {
   "wordId": "w_7f3a",
   "text": "산성비",
-  "tier": "medium",
+  "keystrokes": 8,
   "lane": 2,
   "fallDurationMs": 4900,
   "spawnedAt": "2026-07-19T10:00:03.120Z"
@@ -321,7 +328,7 @@ Redis 세션 키: `game:acidroom:{roomId}` (TTL: **1800s(30분)** — 매치 최
   "roomId": "room-uuid",
   "hp": { "host": 82, "guest": 91 },
   "activeWords": [
-    { "wordId": "w_c410", "text": "타자", "tier": "easy", "lane": 4, "fallDurationMs": 4600, "spawnedAt": "2026-07-19T10:01:10.000Z" }
+    { "wordId": "w_c410", "text": "타자", "keystrokes": 4, "lane": 4, "fallDurationMs": 4600, "spawnedAt": "2026-07-19T10:01:10.000Z" }
   ],
   "elapsedMs": 47000,
   "spawnIntervalMs": 1650,
@@ -412,7 +419,7 @@ sequenceDiagram
 |---|---|
 | `AcidRainGateway`(`/game` 네임스페이스, §6.3 이벤트) | 미구현 (계약 확정, 구현은 `transcendence_backend#74`). 구 `/game` 소켓 핸들러(`game.gateway.ts`, TCG `submit_cards`/`phase_update`)는 `#72`에서 제거되어 현재 `/game` 네임스페이스는 비어있음 |
 | `AcidRainService`(스폰 루프, HP/데미지, 레인 배정, Redis `game:acidroom:{roomId}`) | 미구현 (`transcendence_backend#75`) |
-| `word-bank.ts`(한국어 단어 큐레이션) | 미구현 (`transcendence_backend#73`) |
+| `word-bank.ts`(한국어 단어 큐레이션) | **완료** — 400개, `keystrokes` 기반 난이도로 재설계됨. PR [#86](https://github.com/222transcendence/transcendence_backend/pull/86) 리뷰 대기 중 (`transcendence_backend#73`) |
 | 구 TCG 코드(`src/game/` 내 Character/Card/dice 등) | **완료** — PR [#84](https://github.com/222transcendence/transcendence_backend/pull/84) 리뷰 대기 중 (`transcendence_backend#72`) |
 | DB 스키마(`characters`/`cards` 테이블, `match_history.turnsPlayed`) | **완료** — PR #81 머지됨, `dev`에 반영 (`transcendence_backend#71`) |
 | 프론트엔드 이벤트 계약(`useAcidRainSocket.ts`, `types/acidRain.ts`) | 본 문서와 불일치, 재작성 예정 (`transcendence_frontend#40`, `#41`) |
