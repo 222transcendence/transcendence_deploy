@@ -7,9 +7,10 @@
 
 ### 0.1. Room Object
 
-> **갱신 (2026-08-11, `#92`)**: `host`/`guest` 2슬롯 고정 구조를 `players[]` 배열(2~4명)로 확장한다.
+> **갱신 (2026-08-11, `transcendence_deploy#92`)**: `host`/`guest` 2슬롯 고정 구조를 `players[]`
+> 배열(2~4명)로 확장한다.
 > 방을 만든 사람의 방 관리 권한(강퇴/방 폭파)은 `hostUserId`로 유지한다. 아래가 정본이며, 구현은
-> `#95`(로비 룸 모델 확장)가 담당한다.
+> `transcendence_backend#95`(로비 룸 모델 확장)가 담당한다.
 
 ```json
 {
@@ -36,7 +37,7 @@
 | `CREATE_ROOM` | `{ maxPlayers? }` | 새 방 생성, 본인이 호스트가 됨. `maxPlayers`는 2~4(기본 4), 생략 시 기본값 |
 | `JOIN_ROOM` | `{ roomId }` | 대기중인 방에 참가자로 입장. `players.length >= maxPlayers`면 `ACTION_REJECTED{message:'Room is already full'}` |
 | `GET_ROOM` | `{ roomId }` | 특정 방의 현재 상태 조회. 인증된 사용자가 이미 `players`에 등록된 방이면 즉시 `ROOM_UPDATED` 응답 (대기실 페이지 진입/재연결 시 사용) |
-| `LEAVE_ROOM` | `{ roomId }` | 방 퇴장 (호스트 퇴장 시 방 폭파 — 호스트 위임은 `backend#68` 별도 이슈) |
+| `LEAVE_ROOM` | `{ roomId }` | 방 퇴장 (호스트 퇴장 시 방 폭파 — 호스트 위임은 `transcendence_backend#68` 별도 이슈) |
 | `SET_READY` | `{ roomId, ready }` | 준비 완료/취소 토글 |
 
 ### 0.3. Server → Client Messages
@@ -71,7 +72,7 @@ sequenceDiagram
     C1->>S: SET_READY (true)
     C2->>S: SET_READY (true)
     C3->>S: SET_READY (true)
-    Note over S: 최소 2명 이상 참가 + 전원 ready 시 시작 (호스트가 인원 미달로 대기 종료 가능 여부는 #95에서 결정)
+    Note over S: 최소 2명 이상 참가 + 전원 ready 시 시작 (호스트가 인원 미달로 대기 종료 가능 여부는 transcendence_backend#95에서 결정)
     S->>C1: GAME_START (roomId)
     S->>C2: GAME_START (roomId)
     S->>C3: GAME_START (roomId)
@@ -248,11 +249,10 @@ sequenceDiagram
     end
 ```
 
-### 6.3 이벤트 정의 — 산성비(Acid Rain) 타자 대전 (2~4인 배틀로얄, 설계 확정 — `#92`)
+### 6.3 이벤트 정의 — 산성비(Acid Rain) 타자 대전 (2~4인 배틀로얄, 설계 확정 — `transcendence_deploy#92`)
 
-규칙 상세는 `GAME_DESIGN.md`를 정본으로 한다. 아래는 2~4인 배틀로얄 기준 최신 계약이다 — 1:1 전용
-`{host, guest}` 구조는 폐기되었다(과거 계약은 "계약 확정 노트 (2026-08-09)" 섹션에 남아있으나
-`players[]`/`Record<userId, …>` 기반으로 대체됨).
+규칙 상세는 `GAME_DESIGN.md`를 정본으로 한다. 아래는 2~4인 PvP와 공통 산성비 엔진이 사용하는 현재
+유효한 이벤트 계약이다.
 
 Socket.io 룸 키: `game:{roomId}` (서버 내부 브로드캐스트 채널)
 
@@ -262,13 +262,16 @@ Redis 세션 키: `game:acidroom:{roomId}` (TTL: **1800s(30분)** — 매치 최
 서버는 스폰 타이밍/순서와 정오답 판정을 전적으로 결정하는 **권위 서버**다. 클라이언트는 로컬 타이머로
 판정하지 않고, 서버가 보낸 이벤트만 신뢰하며 `now`(서버 시각) 필드로 클록 오차를 보정한다.
 
+> #76은 payload 구조 자체를 변경하지 않는다. 여러 `ACTIVE` 단어, `wordId` 기반 제출, 단어 상태 전이,
+> 길이 기반 위험/보상 규칙은 참가자 수와 무관한 공통 게임 규칙으로 확정한다.
+
 #### 클라이언트 → 서버
 
 | Event | Payload | Description |
 |---|---|---|
-| `join_room` | `{ roomId: string }` | 소켓 룸 입장/재입장. 두 플레이어 모두 입장하면 `match_ready` 브로드캐스트 |
+| `join_room` | `{ roomId: string }` | 소켓 룸 입장/재입장. 매치 참가자 전원이 소켓 룸에 입장하면 `match_ready` 브로드캐스트 |
 | `leave_room` | `{ roomId: string }` | 명시적 퇴장 (매치 진행 중이면 몰수패 처리) |
-| `word_submit` | `{ roomId: string, wordId: string, text: string, clientTs: number }` | 단어 입력 제출. `clientTs`는 지연시간 텔레메트리용이며 판정에는 사용하지 않음. 서버는 `wordId`+유저 기준으로 멱등 처리(재전송해도 중복 판정 없음) |
+| `word_submit` | `{ roomId: string, wordId: string, text: string, clientTs: number }` | 단어 입력 제출. 화면에 여러 `ACTIVE` 단어가 동시에 있어도 클라이언트는 목표 단어의 `wordId`를 함께 보내므로 서버가 어떤 단어에 대한 제출인지 구분한다. `clientTs`는 지연시간 텔레메트리용이며 판정에는 사용하지 않음. 서버는 `wordId`+유저 기준으로 멱등 처리(재전송해도 중복 판정 없음) |
 
 #### 서버 → 클라이언트
 
@@ -276,11 +279,11 @@ Redis 세션 키: `game:acidroom:{roomId}` (TTL: **1800s(30분)** — 매치 최
 |---|---|---|
 | `match_ready` | `{ roomId, protocolVersion, players: PlayerPublic[] }` | 참가자(2~4명) 전원 소켓 룸 입장 완료, 카운트다운 시작 신호 |
 | `match_start` | `{ roomId, startAt, now, initialHp }` | 동기화된 매치 시작. `now`(서버 현재 시각)로 클라이언트 클록 오차 보정. `initialHp`는 전원 동일(100) |
-| `word_spawn` | `{ wordId, text, keystrokes, lane, fallDurationMs, spawnedAt }` | 참가자 전원에게 동일하게 브로드캐스트되는 단어 스트림. `keystrokes`는 2벌식 기준 실제 타건 횟수(`word-bank.ts`의 `WordEntry.keystrokes`, §3.2 참고) — 낙하 시간·데미지 계산에 쓰이므로 클라이언트도 함께 받는다. `lane`은 서버가 결정하는 가로 슬롯 인덱스(정수)로, 모든 클라이언트가 같은 단어를 항상 같은 위치에서 렌더링하도록 보장한다. 참가자 수와 무관하게 구조 변경 없음 |
+| `word_spawn` | `{ wordId, text, keystrokes, lane, fallDurationMs, spawnedAt }` | 참가자 전원에게 동일하게 브로드캐스트되는 단어 스트림. 한 방에는 여러 `ACTIVE` 단어가 동시에 존재할 수 있으며, 각 단어는 고유 `wordId`로 구분된다. `keystrokes`는 2벌식 기준 실제 타건 횟수(`word-bank.ts`의 `WordEntry.keystrokes`, §3.2 참고) — 낙하 시간·데미지 계산에 쓰이므로 클라이언트도 함께 받는다. `lane`은 서버가 결정하는 가로 슬롯 인덱스(정수)로, 모든 클라이언트가 같은 단어를 항상 같은 위치에서 렌더링하도록 보장한다. 참가자 수와 무관하게 구조 변경 없음 |
 | `word_cleared` | `{ wordId, clearedBy, targetUserId, damage, hp: Record<userId, number> }` | 누군가 먼저 정확히 입력해 단어가 지워짐. `targetUserId`는 서버가 `clearedBy`를 제외한 생존자 중 무작위로 고른 데미지 대상 1명(`GAME_DESIGN.md` §3.6). `hp`는 탈락자를 포함한 전체 참가자의 갱신된 HP 맵 |
 | `word_missed` | `{ wordId, splashDamage, hp: Record<userId, number> }` | 아무도 못 지운 단어가 바닥에 닿음. 그 시점 생존자 전원에게 데미지 적용(§3.6). `hp`는 전체 참가자의 갱신된 HP 맵 |
-| `submit_rejected` | `{ wordId, reason: 'ALREADY_CLEARED' \| 'NOT_FOUND' \| 'WRONG_TEXT' }` | 제출자에게만 전송(레이스 패배/오타) |
-| `player_eliminated` | `{ userId, rank, remainingPlayers }` | **신규(`#92`)**. 특정 참가자의 HP가 0 이하가 되는 즉시 발송. `rank`는 탈락 역순 순위(`GAME_DESIGN.md` §3.1), `remainingPlayers`는 탈락 처리 후 남은 생존자 수. `remainingPlayers === 1`이면 곧이어 `match_end{reason:'KO'}`가 발송됨 |
+| `submit_rejected` | `{ wordId, reason: 'ALREADY_CLEARED' \| 'NOT_FOUND' \| 'WRONG_TEXT' }` | 제출자에게만 전송(레이스 패배/오타). 현재 reason 값은 기존 문서에 기록된 계약이며, 해결 상태 및 오류 코드의 최종 정렬은 `transcendence_backend#109`에서 확정한다. 이번 수정에서는 코드 목록이나 payload를 새로 변경하지 않는다 |
+| `player_eliminated` | `{ userId, rank, remainingPlayers }` | **신규(`transcendence_deploy#92`)**. 특정 참가자의 HP가 0 이하가 되는 즉시 발송. `rank`는 탈락 역순 순위(`GAME_DESIGN.md` §3.1), `remainingPlayers`는 탈락 처리 후 남은 생존자 수. `remainingPlayers === 1`이면 곧이어 `match_end{reason:'KO'}`가 발송됨 |
 | `state_sync` | `{ roomId, hp: Record<userId, number>, activeWords: WordSpawnPayload[], elapsedMs, spawnIntervalMs, now }` | 재접속 시 전체 스냅샷. `hp`는 탈락자 포함 전체 참가자 맵(탈락자는 값이 0으로 유지되어 프론트가 "탈락" UI를 그릴 수 있음) |
 | `opponent_disconnected` | `{ userId, graceMs: 30000 }` | 특정 참가자 연결 끊김, 유예 시작(이름은 1:1 시절 유지, N인에서도 동일 이벤트명 사용) |
 | `opponent_reconnected` | `{ userId }` | 유예 중 해당 참가자 복귀 |
@@ -496,12 +499,12 @@ sequenceDiagram
 | 프론트엔드 이벤트 계약(`useAcidRainSocket.ts`, `types/acidRain.ts`) | **완료** — PR #45 머지됨 (`transcendence_frontend#40`, `#41`) |
 | 로비의 룸 관리 로직(`createRoom`/`joinRoom`/`setReady` 등) | 유지 — 로비가 의존하는 범용 로직. `#72`에서 `characterId` 파라미터 제거, `PlayerSession.ready` 필드로 정식 타입화(기존 `(room as any).hostReady` 캐스트 제거) |
 
-**2~4인 배틀로얄 확장** — `#91`(EPIC). 위 1:1 표 항목들을 아래 계약(§0.1/§6.3의 `players[]`,
-`player_eliminated`, `Record<userId,…>` 기반)에 맞춰 재작성하는 단계.
+**2~4인 배틀로얄 구현 범위** — `transcendence_deploy#91`(EPIC). 위 1:1 구현 항목들을 아래 현재
+계약(§0.1/§6.3의 `players[]`, `player_eliminated`, `Record<userId,…>` 기반)에 맞춰 재작성하는 단계.
 
 | 항목 | 현재 상태 |
 |---|---|
-| Room Object/`players[]`, 배틀로얄 규칙(§0.1, §6.3, `GAME_DESIGN.md` §1/§3.1/§3.6/§3.9) | **설계 확정** — 본 문서(`#92`) |
+| Room Object/`players[]`, 배틀로얄 규칙(§0.1, §6.3, `GAME_DESIGN.md` §1/§3.1/§3.6/§3.9) | **설계 확정** — 본 문서(`transcendence_deploy#92`) |
 | DB 마이그레이션(`MatchHistory` → N인 참가자 조인 테이블) | 구현 예정 — `transcendence_backend#93` |
 | `AcidRainService`/`AcidRainGateway`를 `players[]` 기반으로 재작성 | 구현 예정 — `transcendence_backend#94` |
 | 로비 룸 모델 확장(최대 4명) | 구현 예정 — `transcendence_backend#95` |
