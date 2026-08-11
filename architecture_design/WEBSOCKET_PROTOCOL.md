@@ -253,7 +253,7 @@ Redis 세션 키: `game:acidroom:{roomId}` (TTL: **1800s(30분)** — 매치 최
 |---|---|---|
 | `match_ready` | `{ roomId, protocolVersion, players: { host: PlayerPublic, guest: PlayerPublic } }` | 양쪽 소켓 룸 입장 완료, 카운트다운 시작 신호 |
 | `match_start` | `{ roomId, startAt, now, initialHp }` | 동기화된 매치 시작. `now`(서버 현재 시각)로 클라이언트 클록 오차 보정 |
-| `word_spawn` | `{ wordId, text, tier, fallDurationMs, spawnedAt }` | 양쪽 클라이언트에 동일하게 브로드캐스트되는 단어 스트림 |
+| `word_spawn` | `{ wordId, text, keystrokes, lane, fallDurationMs, spawnedAt }` | 양쪽 클라이언트에 동일하게 브로드캐스트되는 단어 스트림. `keystrokes`는 2벌식 기준 실제 타건 횟수(`word-bank.ts`의 `WordEntry.keystrokes`, §3.2 참고) — 낙하 시간·데미지 계산에 쓰이므로 클라이언트도 함께 받는다. `lane`은 서버가 결정하는 가로 슬롯 인덱스(정수)로, 두 클라이언트가 같은 단어를 항상 같은 위치에서 렌더링하도록 보장한다 |
 | `word_cleared` | `{ wordId, clearedBy, damage, targetHp: { host, guest } }` | 누군가 먼저 정확히 입력해 단어가 지워짐. 상대방에게 데미지 적용 |
 | `word_missed` | `{ wordId, splashDamage, targetHp: { host, guest } }` | 아무도 못 지운 단어가 바닥에 닿음. 양쪽 모두 데미지 |
 | `submit_rejected` | `{ wordId, reason: 'ALREADY_CLEARED' \| 'NOT_FOUND' \| 'WRONG_TEXT' }` | 제출자에게만 전송(레이스 패배/오타) |
@@ -265,17 +265,52 @@ Redis 세션 키: `game:acidroom:{roomId}` (TTL: **1800s(30분)** — 매치 최
 
 `PlayerPublic = { userId, nickname }`.
 
+#### 계약 확정 노트 (2026-08-09)
+
+프론트엔드 초기 구현(`useAcidRainSocket.ts`, `types/acidRain.ts`)이 아래 두 가지를 별도 이벤트로
+가정하고 있었으나, **이 문서(§6.3)가 정본이며 그런 이벤트는 존재하지 않는다.** 프론트엔드는
+`transcendence_frontend#40` 이슈에서 아래 내용에 맞춰 재작성한다.
+
+- **낙하 높이(진행도) 동기화가 최우선이다.** 두 클라이언트가 같은 단어를 같은 순간에 같은 높이로
+  보이게 하려면, 애니메이션 시작 시각을 **로컬 수신 시각(`Date.now()`)이 아니라 서버 `spawnedAt`을
+  클록 오차 보정한 값**으로 잡아야 한다 (오차 보정은 `match_start.now` vs 클라이언트 수신 시각의 차이,
+  §"Reconnection Logic"의 heartbeat/PING-PONG로 주기적으로 갱신). 이전 프론트 구현은 수신 시각을
+  그대로 써서 네트워크 지연만큼 두 화면의 낙하 높이가 어긋났다 — 이게 위치(레인) 불일치보다 더 큰
+  문제이므로 `transcendence_frontend#41`에서 우선 수정 대상으로 삼는다.
+- **`countdown` 이벤트는 없다.** 카운트다운은 클라이언트가 `match_start.startAt`과 `now`(서버 시각)로
+  직접 계산한다. 서버가 매 초 별도로 브로드캐스트하지 않는다.
+- **`hp_update` 이벤트는 없다.** HP 변화는 항상 `word_cleared.targetHp` 또는 `word_missed.targetHp`에
+  실려 온다. HP만 갱신하는 별도 이벤트는 만들지 않는다.
+- **단어 낙하 위치(`lane`)는 서버가 결정한다.** 클라이언트가 `Math.random()`으로 위치를 생성하지 않는다
+  (이전 프론트 구현의 문제점). 아래 `word_spawn` 예시의 `lane` 필드 참고. `state_sync`로 복구되는
+  진행 중 단어도 원래 배정된 `lane`을 그대로 유지한다(재접속 시 위치가 바뀌지 않음). 다만 이는 판정에
+  영향을 주지 않는 시각적 일관성 문제로, 높이 동기화보다 우선순위가 낮다.
+- `match_ready`/`match_start`/`word_cleared`/`word_missed`/`state_sync`의 필드명은 본 문서(§6.3)
+  표와 아래 예시가 유일한 정본이다.
+
+#### 추가 갱신 (2026-08-11) — `tier` → `keystrokes`
+
+`word-bank.ts`(`#73`, PR #86) 구현 과정에서 단어 난이도를 음절 수 기반 3티어(easy/medium/hard)
+대신 **2벌식 키보드 실제 타건 횟수**(`keystrokes: number`)로 재정의했다. `word_spawn`/`state_sync`의
+`tier` 필드는 `keystrokes`로 교체됐다 — 상세 근거와 낙하 시간·데미지 계산식은 `GAME_DESIGN.md`
+§3.2/§3.4~3.6 참고 (`#87`).
+
 #### `word_spawn` payload 예시
 
 ```json
 {
   "wordId": "w_7f3a",
   "text": "산성비",
-  "tier": "medium",
+  "keystrokes": 8,
+  "lane": 2,
   "fallDurationMs": 4900,
   "spawnedAt": "2026-07-19T10:00:03.120Z"
 }
 ```
+
+`lane`은 `0`부터 `LANE_COUNT - 1`(MVP 기준 5개 레인, 0~4) 사이의 정수다. 서버는 스폰 시점에 현재
+낙하 중인 단어들과 레인이 겹치지 않도록 우선 배정하되, 모든 레인이 사용 중이면 임의의 레인에 배정한다
+(짧게 겹쳐 보일 수 있으나 판정은 텍스트 기준이라 게임 결과에는 영향 없음).
 
 #### `word_cleared` / `word_missed` payload 예시
 
@@ -293,7 +328,7 @@ Redis 세션 키: `game:acidroom:{roomId}` (TTL: **1800s(30분)** — 매치 최
   "roomId": "room-uuid",
   "hp": { "host": 82, "guest": 91 },
   "activeWords": [
-    { "wordId": "w_c410", "text": "타자", "tier": "easy", "fallDurationMs": 4600, "spawnedAt": "2026-07-19T10:01:10.000Z" }
+    { "wordId": "w_c410", "text": "타자", "keystrokes": 4, "lane": 4, "fallDurationMs": 4600, "spawnedAt": "2026-07-19T10:01:10.000Z" }
   ],
   "elapsedMs": 47000,
   "spawnIntervalMs": 1650,
@@ -376,17 +411,20 @@ sequenceDiagram
 }
 ```
 
-### 6.5 구현 상태 (2026-07-19 기준)
+### 6.5 구현 상태 (2026-08-11 기준)
 
-산성비 스키마는 **설계 확정, 구현 착수 전** 상태다.
+이벤트 계약은 **최종 확정**(위 "계약 확정 노트" 참고, `lane` 필드 추가 포함).
 
 | 항목 | 현재 상태 |
 |---|---|
-| `AcidRainGateway`(`/game` 네임스페이스, §6.3 이벤트) | 미구현 (설계만 확정) |
-| `AcidRainService`(스폰 루프, HP/데미지, Redis `game:acidroom:{roomId}`) | 미구현 |
-| `word-bank.ts`(한국어 단어 큐레이션) | 미구현 |
-| 로비의 룸 관리 로직(`createRoom`/`joinRoom`/`setReady` 등) | 유지 — 로비가 의존하는 범용 로직 |
-| REST 방 엔드포인트(`POST rooms`, `POST rooms/:id/join` 등) | 삭제 예정 (실사용처 없음 확인됨) |
+| `AcidRainGateway`(`/game` 네임스페이스, §6.3 이벤트) | **완료** — PR [#88](https://github.com/222transcendence/transcendence_backend/pull/88) 머지됨 (`transcendence_backend#74`) |
+| `AcidRainService`(스폰 루프, HP/데미지, 레인 배정, Redis `game:acidroom:{roomId}`) | **완료** — keystrokes 기반(§3.5/§3.6)으로 구현. PR #97 → #88에 포함되어 머지됨 (`transcendence_backend#75`) |
+| `word-bank.ts`(한국어 단어 큐레이션) | **완료** — 400개, `keystrokes` 기반 난이도로 재설계됨. PR #86 머지됨 (`transcendence_backend#73`) |
+| legacy 게임 코드(`src/game/` 내 기존 직업/액션 데이터 및 판정 로직) | **완료** — PR #84 머지됨 (`transcendence_backend#72`) |
+| DB 스키마(legacy 액션 테이블, `match_history.turnsPlayed`) | **완료** — PR #81 머지됨 (`transcendence_backend#71`) |
+| 프론트엔드 이벤트 계약(`useAcidRainSocket.ts`, `types/acidRain.ts`) | **완료** — PR #45 머지됨 (`transcendence_frontend#40`, `#41`) |
+| 로비의 룸 관리 로직(`createRoom`/`joinRoom`/`setReady` 등) | 유지 — 로비가 의존하는 범용 로직. `#72`에서 `characterId` 파라미터 제거, `PlayerSession.ready` 필드로 정식 타입화(기존 `(room as any).hostReady` 캐스트 제거) |
+| REST 방 엔드포인트(`POST rooms`, `POST rooms/:id/join` 등) | **완료** — PR #84에서 `#72`와 함께 제거됨 (`transcendence_backend#78`) |
 
 ### 6.6 프론트엔드 구현 파일 (계획)
 

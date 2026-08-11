@@ -34,7 +34,7 @@
 |---|---|---|---|---|---|---|
 | P2-01 | Authentication: signup/login/profile update E2E |  | TODO |  |  |  |
 | P2-02 | Password hashing and salting verification in DB | hijae | Done | auth.service.ts | test_auth.sh E2E signup test | feat(auth): implement signup api with password hashing [#7] [P2-02] |
-| P2-03 | Basic TCG card duel gameplay loop (Dice, Initiative, Status Effects) complete | yuhyoon | Done | game-engine.ts, game.service.ts | game-engine.spec.ts unit tests pass | feat(game): implement core card duel engine with dice, initiative, status effects [P2-03] |
+| P2-03 | Basic Acid Rain typing battle gameplay loop complete | yuhyoon | Done | GAME_DESIGN.md, WEBSOCKET_PROTOCOL.md | 산성비 게임 흐름 문서 검토 | backend#72, backend#75, deploy#65 |
 | P2-04 | WebSocket real-time sync for game state |  | TODO |  |  |  |
 | P2-05 | Chat messaging latency target (<1s) validated |  | TODO |  |  |  |
 | P2-06 | Friend system flow: add/accept/status update |  | TODO |  |  |  |
