@@ -1,0 +1,47 @@
+name: Sync submodule pointer
+
+on:
+  repository_dispatch:
+    types: [submodule-updated]
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout dev
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+
+      - name: Update submodule gitlink to latest dev
+        env:
+          REPO: ${{ github.event.client_payload.repo }}
+          PAT: ${{ secrets.DEPLOY_SYNC_PAT }}
+        run: |
+          if [ -z "$REPO" ]; then
+            echo "No repo in client_payload" >&2
+            exit 1
+          fi
+
+          NEW_SHA=$(git ls-remote "https://x-access-token:${PAT}@github.com/222transcendence/${REPO}.git" refs/heads/dev | cut -f1)
+          if [ -z "$NEW_SHA" ]; then
+            echo "Could not resolve dev SHA for $REPO" >&2
+            exit 1
+          fi
+
+          CURRENT_SHA=$(git rev-parse "HEAD:$REPO")
+          echo "current=$CURRENT_SHA new=$NEW_SHA"
+
+          if [ "$CURRENT_SHA" = "$NEW_SHA" ]; then
+            echo "Already up to date, nothing to do."
+            exit 0
+          fi
+
+          git update-index --add --cacheinfo 160000,"$NEW_SHA","$REPO"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: 서브모듈 포인터 자동 업데이트 ($REPO -> ${NEW_SHA:0:7})"
+          git push origin dev
