@@ -16,17 +16,6 @@ jobs:
         with:
           ref: dev
 
-      - name: DEBUG token check (temporary)
-        env:
-          PAT: ${{ secrets.DEPLOY_SYNC_PAT }}
-        run: |
-          echo "PAT length: ${#PAT}"
-          curl -sS -H "Authorization: token ${PAT}" -H "Accept: application/vnd.github+json" \
-            https://api.github.com/repos/222transcendence/transcendence_backend \
-            -o /dev/null -w "HTTP status: %{http_code}\n"
-          curl -sS -H "Authorization: token ${PAT}" https://api.github.com/user \
-            -o /dev/null -w "user lookup HTTP status: %{http_code}\n"
-
       - name: Update submodule gitlink to latest dev
         env:
           REPO: ${{ github.event.client_payload.repo }}
@@ -37,7 +26,11 @@ jobs:
             exit 1
           fi
 
-          NEW_SHA=$(git ls-remote "https://x-access-token:${PAT}@github.com/222transcendence/${REPO}.git" refs/heads/dev | cut -f1)
+          # actions/checkout이 이 저장소에 심어둔 http.https://github.com/.extraheader가
+          # github.com으로 가는 모든 요청에 GITHUB_TOKEN(이 저장소 전용, backend/frontend 접근 불가)을
+          # 강제로 끼워 넣어 URL에 담은 PAT 인증을 덮어써버린다. 이 명령에서만 무효화.
+          NEW_SHA=$(git -c http.https://github.com/.extraheader= \
+            ls-remote "https://x-access-token:${PAT}@github.com/222transcendence/${REPO}.git" refs/heads/dev | cut -f1)
           if [ -z "$NEW_SHA" ]; then
             echo "Could not resolve dev SHA for $REPO" >&2
             exit 1
