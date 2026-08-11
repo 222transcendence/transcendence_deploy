@@ -421,7 +421,7 @@ All endpoints below are prefixed with `/api/chat` and require **JWT Bearer Token
           "hostUser": { "id": "...", "nickname": "...", "avatar": "..." },
           "guestUser": { "id": "...", "nickname": "...", "avatar": "..." },
           "winner": { "id": "...", "nickname": "..." },
-          "turnsPlayed": 8,
+          "roundsPlayed": 8,
           "createdAt": "2026-06-30T12:00:00Z"
         }
       ],
