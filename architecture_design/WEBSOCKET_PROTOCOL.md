@@ -418,7 +418,7 @@ sequenceDiagram
 | 항목 | 현재 상태 |
 |---|---|
 | `AcidRainGateway`(`/game` 네임스페이스, §6.3 이벤트) | 미구현 (계약 확정, 구현은 `transcendence_backend#74`). 구 `/game` 소켓 핸들러(`game.gateway.ts`, TCG `submit_cards`/`phase_update`)는 `#72`에서 제거되어 현재 `/game` 네임스페이스는 비어있음 |
-| `AcidRainService`(스폰 루프, HP/데미지, 레인 배정, Redis `game:acidroom:{roomId}`) | 미구현 (`transcendence_backend#75`) |
+| `AcidRainService`(스폰 루프, HP/데미지, 레인 배정, Redis `game:acidroom:{roomId}`) | **완료** — keystrokes 기반(§3.5/§3.6)으로 구현. PR [#97](https://github.com/222transcendence/transcendence_backend/pull/97) 리뷰 대기 중 (`transcendence_backend#75`) |
 | `word-bank.ts`(한국어 단어 큐레이션) | **완료** — 400개, `keystrokes` 기반 난이도로 재설계됨. PR [#86](https://github.com/222transcendence/transcendence_backend/pull/86) 리뷰 대기 중 (`transcendence_backend#73`) |
 | 구 TCG 코드(`src/game/` 내 Character/Card/dice 등) | **완료** — PR [#84](https://github.com/222transcendence/transcendence_backend/pull/84) 리뷰 대기 중 (`transcendence_backend#72`) |
 | DB 스키마(`characters`/`cards` 테이블, `match_history.turnsPlayed`) | **완료** — PR #81 머지됨, `dev`에 반영 (`transcendence_backend#71`) |
