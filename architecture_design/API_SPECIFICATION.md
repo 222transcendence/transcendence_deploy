@@ -1,5 +1,16 @@
 # API Specification v3 (Enterprise Standard)
 
+## 0. 경로 규칙 — `/api/` 접두사 통일
+
+모든 REST 엔드포인트는 `/api/` 접두사로 시작한다 (`/api/auth/*`, `/api/users/*`, `/api/friends/*`,
+`/api/chat/*`, `/api/game/*`). nginx의 `location /api` 블록이 이 접두사 기준으로 백엔드에 프록시하므로,
+컨트롤러가 접두사를 빠뜨리면 프론트가 문서대로 호출해도 실제로는 404가 난다.
+
+**2026-08-11 발견/수정**: `GameController`가 `@Controller('game')`로 선언돼 있어 실제 라우트가
+`/game/*`였고, 문서(`API_SPECIFICATION.md`, `WEBSOCKET_PROTOCOL.md` §6.4)와 프론트(`api/gameStats.ts`)는
+이미 `/api/game/*`를 전제로 하고 있어서 전적/리더보드 API가 실제로는 항상 404였다.
+`@Controller('api/game')`로 수정해 통일함. 새 컨트롤러를 추가할 때는 반드시 `api/` 접두사를 포함할 것.
+
 ## 1. Request/Response Envelope
 모든 응답은 일관된 형식을 유지함.
 
@@ -421,7 +432,7 @@ All endpoints below are prefixed with `/api/chat` and require **JWT Bearer Token
           "hostUser": { "id": "...", "nickname": "...", "avatar": "..." },
           "guestUser": { "id": "...", "nickname": "...", "avatar": "..." },
           "winner": { "id": "...", "nickname": "..." },
-          "turnsPlayed": 8,
+          "roundsPlayed": 8,
           "createdAt": "2026-06-30T12:00:00Z"
         }
       ],
