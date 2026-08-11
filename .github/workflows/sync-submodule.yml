@@ -16,6 +16,17 @@ jobs:
         with:
           ref: dev
 
+      - name: DEBUG token check (temporary)
+        env:
+          PAT: ${{ secrets.DEPLOY_SYNC_PAT }}
+        run: |
+          echo "PAT length: ${#PAT}"
+          curl -sS -H "Authorization: token ${PAT}" -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/222transcendence/transcendence_backend \
+            -o /dev/null -w "HTTP status: %{http_code}\n"
+          curl -sS -H "Authorization: token ${PAT}" https://api.github.com/user \
+            -o /dev/null -w "user lookup HTTP status: %{http_code}\n"
+
       - name: Update submodule gitlink to latest dev
         env:
           REPO: ${{ github.event.client_payload.repo }}
