@@ -108,10 +108,27 @@ services:
     networks:
       - transcendence_net
 
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: transcendence_grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafanadata:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+    networks:
+      - transcendence_net
+
 volumes:
   pgdata:
   redisdata:
   backend_uploads:
+  grafanadata:
 
 networks:
   transcendence_net:
