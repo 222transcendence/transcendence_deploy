@@ -125,7 +125,7 @@ Chat WebSocket은 `/chat` namespace에서 동작합니다. 연결 시 반드시 
 |------|------|------|------|
 | `content` | string | ✓ | 메시지 내용 (비어있을 수 없음) |
 | `roomId` | string | - | 특정 채팅방 ID (없으면 글로벌 채널) |
-| `type` | `"NORMAL"` \| `"INVITE"` | - | 메시지 유형 (기본값: `"NORMAL"`) |
+| `type` | `"NORMAL"` \| `"INVITE"` | - | 메시지 유형 (기본값: `"NORMAL"`). `"SYSTEM"`은 서버 전용이라 클라이언트가 보내면 거부된다 |
 
 #### 서버 → 전체 클라이언트: `receive_message`
 
@@ -142,6 +142,24 @@ Chat WebSocket은 `/chat` namespace에서 동작합니다. 연결 시 반드시 
   }
 }
 ```
+
+`type`은 `"NORMAL"` \| `"INVITE"` \| `"SYSTEM"` 중 하나다. `"SYSTEM"`은 특정 유저가 보낸 메시지가 아니라
+서버가 생성한 알림(대기실 입장/퇴장 등, `#67`)이므로 `sender`가 `null`이다. 클라이언트는 렌더링 전에
+반드시 `sender`가 `null`일 수 있음을 처리해야 한다.
+
+```json
+{
+  "id": "uuid-v4",
+  "content": "player1 님이 입장하셨습니다.",
+  "roomId": "room-id",
+  "type": "SYSTEM",
+  "createdAt": "2026-06-22T12:00:00.000Z",
+  "sender": null
+}
+```
+
+SYSTEM 메시지는 `GET /api/chat/history`(5.5) 응답에는 포함되지 않는다 — 저장은 되지만 히스토리 조회는
+`NORMAL` 타입만 반환하므로, 재접속 시 과거 입장/퇴장 알림이 다시 나타나지 않는다.
 
 ### 5.3 연결 시퀀스
 
