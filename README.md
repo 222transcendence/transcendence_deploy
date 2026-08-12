@@ -15,9 +15,9 @@
 ### Key Features
 - **Real-time Typing Battle**: 서버 권위 기반으로 동기화된 단어 스폰 스트림과 정오답 판정.
 - **Remote Players**: 서로 다른 컴퓨터의 두 플레이어가 실시간으로 대전, 재접속 유예/복구 지원.
-- **AI Opponent**: 사람처럼 지연을 갖고 반응하는 AI 대전 (예정).
+- **AI Opponent**: `AI_OPPONENT_SPEC.md` 기준의 인간형 단어 입력 AI 대전 설계 및 구현 검증.
 - **Social Interaction**: 채팅 및 친구 시스템을 통한 사용자 상호작용.
-- **DevOps Monitoring**: Prometheus와 Grafana를 이용한 시스템 상태 시각화.
+- **DevOps Monitoring**: Prometheus 기반 메트릭 수집과 Grafana 대시보드 검증 대상.
 
 ---
 
@@ -37,22 +37,24 @@
 - **Backend Framework**: NestJS (Node.js)
 - **Real-time**: Socket.io (WebSockets)
 - **Database / ORM**: PostgreSQL / TypeORM
-- **Monitoring**: Prometheus, Grafana
+- **Cache / Session State**: Redis
+- **Reverse Proxy / HTTPS**: Nginx with self-signed TLS certificate for local evaluation
+- **Monitoring**: Prometheus, node-exporter, Grafana dashboard target
 - **Infrastructure**: Docker, Docker Compose
 
 ---
 
 ## 4. Modules & Point Calculation (Total: 15 Points)
-선택한 모듈 리스트 및 점수 계산입니다. (통과 기준: 14점)
+선택한 모듈 리스트 및 점수 계산입니다. (통과 기준: 14점) 각 모듈의 최종 검증 상태는 `CHECKLIST.md`와 평가 전 스모크 테스트 결과를 기준으로 확인합니다.
 
 | Category | Module | Type | Points | Description |
 | :--- | :--- | :--- | :--- | :--- |
 | **Web** | Use a framework (FE/BE) | Major | 2 | React 및 NestJS 프레임워크 사용 |
 | **Web** | Real-time features | Major | 2 | WebSockets 기반 실시간 동기화 |
 | **Web** | User Interaction | Major | 2 | 채팅, 프로필, 친구 시스템 구현 |
-| **Gaming** | Web-based game | Major | 2 | 실시간 웹 기반  게임 |
+| **Gaming** | Web-based game | Major | 2 | 실시간 웹 기반 산성비 타자 대전 |
 | **Gaming** | Remote players | Major | 2 | 원격 사용자 간의 온라인 대전 |
-| **AI** | AI Opponent | Major | 2 | 인간의 행동을 시뮬레이션하는 AI 대전 |
+| **AI** | AI Opponent | Major | 2 | `architecture_design/AI_OPPONENT_SPEC.md` 기준 인간형 AI 대전 |
 | **DevOps** | Monitoring System | Major | 2 | Prometheus & Grafana 대시보드 |
 | **Web** | Use an ORM | Minor | 1 | TypeORM을 통한 효율적인 데이터 관리 |
 | **Total** | | | **15** | |
@@ -72,6 +74,7 @@
 ## 6. Instructions
 ### Prerequisites
 - Docker & Docker Compose
+- Git with submodule support
 - `.env` 파일 설정 (제공된 `.env.example` 참고)
 
 ### Installation & Execution
@@ -87,15 +90,50 @@ docker-compose up --build
 ```
 이후 `https://localhost`에서 서비스를 확인할 수 있습니다.
 
+### First-run Verification
+처음 실행하는 평가자는 아래 순서로 기본 동작을 확인할 수 있습니다.
+
+1. `cp .env.example .env`
+2. `docker-compose up --build`
+3. Chrome에서 `https://localhost` 접속
+4. 회원가입 후 로그인
+5. 로비에서 방 생성/입장, 준비 완료 후 산성비 매치 시작
+6. 채팅, 친구 목록, 프로필/전적 화면 접근 확인
+7. `https://localhost/privacy-policy`, `https://localhost/terms-of-service` 접근 확인
+8. Prometheus와 node-exporter 컨테이너가 실행 중인지 확인
+
+### Service Endpoints
+| Service | URL | Purpose |
+| :--- | :--- | :--- |
+| Web App | `https://localhost` | React frontend through Nginx HTTPS |
+| Backend Health | `https://localhost/api/health` | NestJS health check |
+| Backend Direct | `http://localhost:3000` | Internal API service exposed for local debugging |
+| Frontend Direct | `http://localhost:8080` | Frontend container exposed for local debugging |
+| Prometheus | `http://localhost:9090` | Metrics query UI |
+| Node Exporter | `http://localhost:9100/metrics` | Host/container metrics exporter |
+
 ---
 
 ## 7. Resources & AI Usage
-- **Documentation**: NestJS Docs, React Dev, Socket.io Documentation.
+- **Documentation**: NestJS Docs, React Dev, Socket.io Documentation, `architecture_design/AI_OPPONENT_SPEC.md`.
 - **AI Usage**: [AI_USAGE.md](./AI_USAGE.md) 파일에 상세 기록되어 있습니다.
 
 ---
 
-## 8. Git Flow & Commit Conventions
+## 8. Evaluation Checklist
+평가 전 최종 확인 항목입니다.
+
+- `docker-compose up --build` 한 번으로 전체 스택이 실행됩니다.
+- 최신 안정 버전 Chrome에서 콘솔 에러/경고 없이 주요 화면이 동작합니다.
+- 모든 백엔드 통신은 Nginx HTTPS 엔드포인트를 통해 접근합니다.
+- 이메일/비밀번호 로그인은 bcrypt 해시와 salt를 사용하며, DB에 평문 비밀번호를 저장하지 않습니다.
+- Privacy Policy와 Terms of Service 페이지는 푸터 또는 직접 URL로 접근 가능합니다.
+- README의 팀원 로그인, 선택 모듈, 실행 방법, 브랜치/커밋 규칙이 최신 상태입니다.
+- AI 사용 내역은 [AI_USAGE.md](./AI_USAGE.md)에 기록되어 있고, PR 리뷰에서 팀원이 검토합니다.
+
+---
+
+## 9. Git Flow & Commit Conventions
 
 ### Branching Strategy
 본 프로젝트(transcendence_deploy, transcendence_backend, transcendence_frontend 3개 저장소 공통)는 다음 브랜치 전략을 따릅니다:
@@ -131,4 +169,3 @@ issue/*      ●   ●   ●                (feature/<#>-desc, fix/<#>-desc, ...
 
 예시:
 `feat(auth): 회원가입 API 추가 및 bcrypt 해싱 적용 [P2-02]`
-
