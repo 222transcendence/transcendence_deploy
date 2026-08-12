@@ -505,10 +505,10 @@ sequenceDiagram
 | 항목 | 현재 상태 |
 |---|---|
 | Room Object/`players[]`, 배틀로얄 규칙(§0.1, §6.3, `GAME_DESIGN.md` §1/§3.1/§3.6/§3.9) | **설계 확정** — 본 문서(`transcendence_deploy#92`) |
-| DB 마이그레이션(`MatchHistory` → N인 참가자 조인 테이블) | 구현 예정 — `transcendence_backend#93` |
-| `AcidRainService`/`AcidRainGateway`를 `players[]` 기반으로 재작성 | 구현 예정 — `transcendence_backend#94` |
-| 로비 룸 모델 확장(최대 4명) | 구현 예정 — `transcendence_backend#95` |
-| 전적 통계 API N인 매치 대응 | 구현 예정 — `transcendence_backend#96` |
+| DB 마이그레이션(`MatchHistory` → N인 참가자 조인 테이블) | **완료** — PR #128 머지됨 (`transcendence_backend#93`) |
+| `AcidRainService`/`AcidRainGateway`를 `players[]` 기반으로 재작성 | **완료** — `transcendence_backend#94`, 동시 전멸/TIME_LIMIT 동률 규칙은 `GAME_DESIGN.md` §3.1 참고 |
+| 로비 룸 모델 확장(최대 4명) | **완료** — PR #127 머지됨 (`transcendence_backend#95`) |
+| 전적 통계 API N인 매치 대응 | **완료** — PR #130에 포함되어 머지됨 (`transcendence_backend#96`) |
 | 프론트엔드 `Room`/`RoomPlayer`/`useAcidRainSocket`/`WaitingRoomPage`/`GameBoardPage` | 구현 예정 — `transcendence_frontend#46`~`#49` |
 | REST 방 엔드포인트(`POST rooms`, `POST rooms/:id/join` 등) | **완료** — PR #84에서 `#72`와 함께 제거됨 (`transcendence_backend#78`) |
 
