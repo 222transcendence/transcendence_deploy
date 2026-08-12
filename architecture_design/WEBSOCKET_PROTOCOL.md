@@ -306,10 +306,10 @@ Redis 세션 키: `game:acidroom:{roomId}`
 | `word_spawn` | `{ wordId, text, keystrokes, lane, fallDurationMs, spawnedAt, landAt, damage }` | 낙하 단어 스트림. 한 방에 여러 `ACTIVE` 단어가 동시에 존재할 수 있으며 고유 `wordId`로 구분한다. `keystrokes`는 2벌식 실제 타건 횟수(§3.2). `lane`은 서버가 배정하는 가로 슬롯 인덱스. `landAt`(ISO8601, 바닥 도달 예정 시각)과 `damage`(서버 확정 공격력)는 항상 포함된다 |
 | `word_cleared` | `{ wordId, clearedBy, targetParticipantId, damage, hp: HpByParticipantId }` | 누군가 먼저 정확히 입력해 단어가 지워짐. `targetParticipantId`는 데미지를 받는 참가자(1:1이므로 `clearedBy`가 아닌 쪽). `hp`는 갱신된 전체 참가자 HP 맵 |
 | `word_missed` | `{ wordId, splashDamage, hp: HpByParticipantId }` | 아무도 못 지운 단어가 바닥에 닿음. 생존자 전원에게 스플래시 데미지 적용. `hp`는 갱신된 전체 참가자 HP 맵 |
-| `submit_rejected` | `{ wordId, reason: 'ALREADY_CLEARED' \| 'NOT_FOUND' \| 'WRONG_TEXT' }` | 제출자에게만 전송(레이스 패배/오타) |
+| `submit_rejected` | `{ wordId, reason: 'ALREADY_CLEARED' \| 'NOT_FOUND' \| 'WRONG_TEXT' \| 'PLAYER_ELIMINATED' }` | 제출자에게만 전송(레이스 패배/오타/탈락자의 제출 시도, `backend#157`) |
 | `state_sync` | `{ roomId, participants: ParticipantState[], hp: HpByParticipantId, activeWords: ActiveWordStatePayload[], elapsedMs, spawnIntervalMs, now }` | 재접속(또는 관전 입장, §6.7) 시 전체 스냅샷 |
-| `opponent_disconnected` | `{ userId, graceMs }` | 상대방 연결 끊김, 재접속 유예 시작(이름은 1:1 시절 유지) |
-| `opponent_reconnected` | `{ userId }` | 유예 중 상대방 복귀 |
+| `opponent_disconnected` | `{ userId }` | 상대방 연결 끊김 알림(이름은 1:1 시절 유지). 강제 탈락/승리 처리 데드라인은 없다(`backend#161`) |
+| `opponent_reconnected` | `{ userId }` | 상대방 재접속 복귀 |
 | `match_end` | `{ roomId, winnerId, reason: 'KO' \| 'TIME_LIMIT' \| 'FORFEIT', finalHp: HpByParticipantId, ranking: RankingEntry[], wordsTyped: Record<string, number>, durationSec }` | 매치 종료. `winnerId`는 단독 승자가 없으면(시간초과 동률) `null`. `ranking`은 `{ participantId, rank }[]`(`finalHp`는 별도 필드에서 조회) |
 | `error` | `{ message: string }` | 인증/검증 실패 등 일반 오류 |
 
@@ -400,8 +400,14 @@ Redis 세션 키: `game:acidroom:{roomId}`
   > 이 순서 보장은 **백엔드 인스턴스 1대** 기준이다. Socket.io를 여러 인스턴스로 수평 확장할 경우
   > Redis adapter로 브로드캐스트해도 같은 방의 참가자들이 서로 다른 인스턴스에 붙어있으면 판정
   > 순서가 보장되지 않는다 — 확장 시 방 단위 sticky 라우팅 또는 Redis 기반 분산 락이 필요하다.
-- `disconnect` 시 유예: 방 유지 + 상대방에게 `opponent_disconnected` 알림. 유예 내 `join_room`
-  재전송 시 `state_sync`로 복구. 유예 만료 시 `match_end{reason:'FORFEIT'}`.
+- `disconnect` 시 강제 탈락/승리 처리 데드라인은 없다(`backend#161`) — 방은 그대로 유지되고
+  나머지 참가자에게 `opponent_disconnected` 알림만 간다. 끊긴 참가자는 소켓이 없어 스스로
+  공격(단어 제출)은 못 하지만, 다른 생존자의 타겟 선택/스플래시 데미지는 연결 여부와 무관하게
+  적용되므로 계속 맞을 수는 있다 — 이미 자연스러운 페널티다. 언제든 `join_room` 재전송으로
+  `state_sync` 복구가 가능하고, 재접속 시 `opponent_reconnected`가 브로드캐스트된다. 매치
+  자체가 `MATCH_DURATION_MS`(180초) 하드 타임아웃을 가지고 있어 무한정 멈춰있을 수 없다.
+  명시적으로 `leave_room`을 보내는 경우(스스로 나가겠다고 한 것)는 다르게 취급해 그 참가자만
+  즉시 탈락 처리한다(`eliminateParticipant`).
 - 두 플레이어가 `join_room`을 거의 동시에 보내면 서버가 방별로 join 처리를 직렬화해 레이스를
   방지한다(`backend#144`). 클라이언트도 `match_ready`/`state_sync`를 받을 때까지 `join_room`을
   주기적으로 재전송하는 자가복구 로직을 둔다(`frontend`, `backend#144` 대응).
