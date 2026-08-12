@@ -1,0 +1,11 @@
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: transcendence-webhook
+    receivers:
+      - uid: transcendence-webhook-1
+        type: webhook
+        settings:
+          url: http://backend:3000/api/health
+          httpMethod: POST
