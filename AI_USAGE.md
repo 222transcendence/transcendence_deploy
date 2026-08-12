@@ -14,6 +14,7 @@
 | **Monitoring System** | Prometheus Exporter 설정 및 Grafana PromQL 쿼리 작성 보조 |
 | **AI Opponent** | 패들 이동 예측 알고리즘 및 난이도 조절 로직의 논리적 초안 설계 |
 | **DB ORM** | TypeORM 마이그레이션 전략 및 복잡한 엔티티 간 관계 설정 가이드 |
+| **Game Design Documentation (#76)** | 전략형 산성비의 공통 단어 규칙, 여러 ACTIVE 단어 선택, CLEARED/MISSED 상태 전이, AI 목표 선택 문서 정렬 보조 |
 
 ## 3. 결론
 본 프로젝트의 핵심 아키텍처와 비즈니스 결정은 모두 팀원들의 논의를 통해 이루어졌습니다. AI는 반복적인 설정 작업의 효율화와 기술적 탐색의 보조 도구로만 활용되었음을 명시합니다.
