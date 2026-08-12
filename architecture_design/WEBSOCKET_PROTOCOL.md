@@ -267,78 +267,60 @@ sequenceDiagram
     end
 ```
 
-### 6.3 이벤트 정의 — 산성비(Acid Rain) 타자 대전 (2~4인 배틀로얄, 설계 확정 — `transcendence_deploy#92`)
+### 6.3 이벤트 정의 — 산성비(Acid Rain) 타자 대전 (현재 구현: 1:1, `backend#109`/`backend#138` 기준)
 
-규칙 상세는 `GAME_DESIGN.md`를 정본으로 한다. 아래는 2~4인 PvP와 공통 산성비 엔진이 사용하는 현재
-유효한 이벤트 계약이다.
+> **2026-08-12 갱신**: 이 절은 실제 코드(`transcendence_backend`의 `acid-rain.gateway.ts`/
+> `acid-rain.service.ts`/`acid-rain.interface.ts`)를 기준으로 다시 작성됐다. 이전 버전은
+> `transcendence_deploy#92`에서 설계만 확정하고 실제로 구현되지 않은 N인 배틀로얄 계약
+> (`players[]`, `targetUserId`, `player_eliminated` 등)을 정본으로 표기하고 있었다 — 코드와
+> 어긋나 있었으므로 삭제했다. N인(2~4인) 확장은 `backend#136`(전략형 다중 ACTIVE 단어 엔진,
+> 진행 중)에서 다시 다룬다.
+
+규칙 상세는 `GAME_DESIGN.md`를 정본으로 한다.
 
 Socket.io 룸 키: `game:{roomId}` (서버 내부 브로드캐스트 채널)
 
-Redis 세션 키: `game:acidroom:{roomId}` (TTL: **1800s(30분)** — 매치 최대 180초 + 재접속 유예 30초
-기준으로 설정)
+Redis 세션 키: `game:acidroom:{roomId}`
 
 서버는 스폰 타이밍/순서와 정오답 판정을 전적으로 결정하는 **권위 서버**다. 클라이언트는 로컬 타이머로
 판정하지 않고, 서버가 보낸 이벤트만 신뢰하며 `now`(서버 시각) 필드로 클록 오차를 보정한다.
 
-> #76은 payload 구조 자체를 변경하지 않는다. 여러 `ACTIVE` 단어, `wordId` 기반 제출, 단어 상태 전이,
-> 길이 기반 위험/보상 규칙은 참가자 수와 무관한 공통 게임 규칙으로 확정한다.
+`participants`/`hp` 등은 `participantId` 키를 쓴다. 현재 1:1 휴먼 전용 엔진에서는
+`participantId === userId`이지만, 이 표기는 AI 참가자(`backend#109`, `type: 'AI'`, `userId`
+없음)와 이후 N인 확장을 함께 수용하기 위한 것이다.
 
 #### 클라이언트 → 서버
 
 | Event | Payload | Description |
 |---|---|---|
-| `join_room` | `{ roomId: string }` | 소켓 룸 입장/재입장. 매치 참가자 전원이 소켓 룸에 입장하면 `match_ready` 브로드캐스트 |
-| `leave_room` | `{ roomId: string }` | 명시적 퇴장 (매치 진행 중이면 몰수패 처리) |
-| `word_submit` | `{ roomId: string, wordId: string, text: string, clientTs: number }` | 단어 입력 제출. 화면에 여러 `ACTIVE` 단어가 동시에 있어도 클라이언트는 목표 단어의 `wordId`를 함께 보내므로 서버가 어떤 단어에 대한 제출인지 구분한다. `clientTs`는 지연시간 텔레메트리용이며 판정에는 사용하지 않음. 서버는 `wordId`+유저 기준으로 멱등 처리(재전송해도 중복 판정 없음) |
+| `join_room` | `{ roomId: string }` | 소켓 룸 입장/재입장. 방에 정확히 2명이 있고 둘 다 소켓 룸에 입장하면 `match_ready` 브로드캐스트(2인 초과/미만이면 거부 — `backend#136` 이전까지의 임시 제약) |
+| `leave_room` | `{ roomId: string }` | 명시적 퇴장. 매치가 `IN_PROGRESS`면 몰수패(`FORFEIT`) 처리 |
+| `word_submit` | `{ roomId: string, wordId: string, text: string, clientTs: number, attemptId: string }` | 단어 입력 제출. `wordId`로 어떤 단어에 대한 제출인지 구분. `clientTs`는 텔레메트리용, 판정에는 미사용. `attemptId`는 **필수** — 서버가 이 값으로 재전송(replay)을 구분/방지한다 |
 
 #### 서버 → 클라이언트
 
 | Event | Payload | Description |
 |---|---|---|
-| `match_ready` | `{ roomId, protocolVersion, players: PlayerPublic[] }` | 참가자(2~4명) 전원 소켓 룸 입장 완료, 카운트다운 시작 신호 |
+| `match_ready` | `{ roomId, protocolVersion, participants: ParticipantState[] }` | 양쪽 소켓 모두 룸 입장 완료, 카운트다운 시작 신호 |
 | `match_start` | `{ roomId, startAt, now, initialHp }` | 동기화된 매치 시작. `now`(서버 현재 시각)로 클라이언트 클록 오차 보정. `initialHp`는 전원 동일(100) |
-| `word_spawn` | `{ wordId, text, keystrokes, lane, fallDurationMs, spawnedAt }` | 참가자 전원에게 동일하게 브로드캐스트되는 단어 스트림. 한 방에는 여러 `ACTIVE` 단어가 동시에 존재할 수 있으며, 각 단어는 고유 `wordId`로 구분된다. `keystrokes`는 2벌식 기준 실제 타건 횟수(`word-bank.ts`의 `WordEntry.keystrokes`, §3.2 참고) — 낙하 시간·데미지 계산에 쓰이므로 클라이언트도 함께 받는다. `lane`은 서버가 결정하는 가로 슬롯 인덱스(정수)로, 모든 클라이언트가 같은 단어를 항상 같은 위치에서 렌더링하도록 보장한다. 참가자 수와 무관하게 구조 변경 없음 |
-| `word_cleared` | `{ wordId, clearedBy, targetUserId, damage, hp: Record<userId, number> }` | 누군가 먼저 정확히 입력해 단어가 지워짐. `targetUserId`는 서버가 `clearedBy`를 제외한 생존자 중 무작위로 고른 데미지 대상 1명(`GAME_DESIGN.md` §3.6). `hp`는 탈락자를 포함한 전체 참가자의 갱신된 HP 맵 |
-| `word_missed` | `{ wordId, splashDamage, hp: Record<userId, number> }` | 아무도 못 지운 단어가 바닥에 닿음. 그 시점 생존자 전원에게 데미지 적용(§3.6). `hp`는 전체 참가자의 갱신된 HP 맵 |
-| `submit_rejected` | `{ wordId, reason: 'ALREADY_CLEARED' \| 'NOT_FOUND' \| 'WRONG_TEXT' }` | 제출자에게만 전송(레이스 패배/오타). 현재 reason 값은 기존 문서에 기록된 계약이며, 해결 상태 및 오류 코드의 최종 정렬은 `transcendence_backend#109`에서 확정한다. 이번 수정에서는 코드 목록이나 payload를 새로 변경하지 않는다 |
-| `player_eliminated` | `{ userId, rank, remainingPlayers }` | **신규(`transcendence_deploy#92`)**. 특정 참가자의 HP가 0 이하가 되는 즉시 발송. `rank`는 탈락 역순 순위(`GAME_DESIGN.md` §3.1), `remainingPlayers`는 탈락 처리 후 남은 생존자 수. `remainingPlayers === 1`이면 곧이어 `match_end{reason:'KO'}`가 발송됨 |
-| `state_sync` | `{ roomId, hp: Record<userId, number>, activeWords: WordSpawnPayload[], elapsedMs, spawnIntervalMs, now }` | 재접속 시 전체 스냅샷. `hp`는 탈락자 포함 전체 참가자 맵(탈락자는 값이 0으로 유지되어 프론트가 "탈락" UI를 그릴 수 있음) |
-| `opponent_disconnected` | `{ userId, graceMs: 30000 }` | 특정 참가자 연결 끊김, 유예 시작(이름은 1:1 시절 유지, N인에서도 동일 이벤트명 사용) |
-| `opponent_reconnected` | `{ userId }` | 유예 중 해당 참가자 복귀 |
-| `match_end` | `{ roomId, winnerId, reason: 'KO' \| 'TIME_LIMIT' \| 'FORFEIT', finalHp: Record<userId, number>, ranking: { userId, rank }[] }` | 매치 종료. `winnerId`는 단독 승자가 없으면(시간초과 동률) `null`. `ranking`은 전체 참가자의 최종 순위(§3.1) |
+| `word_spawn` | `{ wordId, text, keystrokes, lane, fallDurationMs, spawnedAt, landAt, damage }` | 낙하 단어 스트림. 한 방에 여러 `ACTIVE` 단어가 동시에 존재할 수 있으며 고유 `wordId`로 구분한다. `keystrokes`는 2벌식 실제 타건 횟수(§3.2). `lane`은 서버가 배정하는 가로 슬롯 인덱스. `landAt`(ISO8601, 바닥 도달 예정 시각)과 `damage`(서버 확정 공격력)는 항상 포함된다 |
+| `word_cleared` | `{ wordId, clearedBy, targetParticipantId, damage, hp: HpByParticipantId }` | 누군가 먼저 정확히 입력해 단어가 지워짐. `targetParticipantId`는 데미지를 받는 참가자(1:1이므로 `clearedBy`가 아닌 쪽). `hp`는 갱신된 전체 참가자 HP 맵 |
+| `word_missed` | `{ wordId, splashDamage, hp: HpByParticipantId }` | 아무도 못 지운 단어가 바닥에 닿음. 생존자 전원에게 스플래시 데미지 적용. `hp`는 갱신된 전체 참가자 HP 맵 |
+| `submit_rejected` | `{ wordId, reason: 'ALREADY_CLEARED' \| 'NOT_FOUND' \| 'WRONG_TEXT' }` | 제출자에게만 전송(레이스 패배/오타) |
+| `state_sync` | `{ roomId, participants: ParticipantState[], hp: HpByParticipantId, activeWords: ActiveWordStatePayload[], elapsedMs, spawnIntervalMs, now }` | 재접속(또는 관전 입장, §6.7) 시 전체 스냅샷 |
+| `opponent_disconnected` | `{ userId, graceMs }` | 상대방 연결 끊김, 재접속 유예 시작(이름은 1:1 시절 유지) |
+| `opponent_reconnected` | `{ userId }` | 유예 중 상대방 복귀 |
+| `match_end` | `{ roomId, winnerId, reason: 'KO' \| 'TIME_LIMIT' \| 'FORFEIT', finalHp: HpByParticipantId, ranking: RankingEntry[], wordsTyped: Record<string, number>, durationSec }` | 매치 종료. `winnerId`는 단독 승자가 없으면(시간초과 동률) `null`. `ranking`은 `{ participantId, rank }[]`(`finalHp`는 별도 필드에서 조회) |
 | `error` | `{ message: string }` | 인증/검증 실패 등 일반 오류 |
 
-`PlayerPublic = { userId, nickname }`.
+`ParticipantPublic = { participantId, userId?, nickname, type: 'HUMAN' | 'AI', aiDifficulty? }`,
+`ParticipantState = ParticipantPublic & { hp: number, rank?: number }`,
+`HpByParticipantId = Record<string, number>` (키: `participantId`),
+`RankingEntry = { participantId: string, rank: number }`.
 
-#### 계약 확정 노트 (2026-08-09)
-
-프론트엔드 초기 구현(`useAcidRainSocket.ts`, `types/acidRain.ts`)이 아래 두 가지를 별도 이벤트로
-가정하고 있었으나, **이 문서(§6.3)가 정본이며 그런 이벤트는 존재하지 않는다.** 프론트엔드는
-`transcendence_frontend#40` 이슈에서 아래 내용에 맞춰 재작성한다.
-
-- **낙하 높이(진행도) 동기화가 최우선이다.** 두 클라이언트가 같은 단어를 같은 순간에 같은 높이로
-  보이게 하려면, 애니메이션 시작 시각을 **로컬 수신 시각(`Date.now()`)이 아니라 서버 `spawnedAt`을
-  클록 오차 보정한 값**으로 잡아야 한다 (오차 보정은 `match_start.now` vs 클라이언트 수신 시각의 차이,
-  §"Reconnection Logic"의 heartbeat/PING-PONG로 주기적으로 갱신). 이전 프론트 구현은 수신 시각을
-  그대로 써서 네트워크 지연만큼 두 화면의 낙하 높이가 어긋났다 — 이게 위치(레인) 불일치보다 더 큰
-  문제이므로 `transcendence_frontend#41`에서 우선 수정 대상으로 삼는다.
-- **`countdown` 이벤트는 없다.** 카운트다운은 클라이언트가 `match_start.startAt`과 `now`(서버 시각)로
-  직접 계산한다. 서버가 매 초 별도로 브로드캐스트하지 않는다.
-- **`hp_update` 이벤트는 없다.** HP 변화는 항상 `word_cleared.targetHp` 또는 `word_missed.targetHp`에
-  실려 온다. HP만 갱신하는 별도 이벤트는 만들지 않는다.
-- **단어 낙하 위치(`lane`)는 서버가 결정한다.** 클라이언트가 `Math.random()`으로 위치를 생성하지 않는다
-  (이전 프론트 구현의 문제점). 아래 `word_spawn` 예시의 `lane` 필드 참고. `state_sync`로 복구되는
-  진행 중 단어도 원래 배정된 `lane`을 그대로 유지한다(재접속 시 위치가 바뀌지 않음). 다만 이는 판정에
-  영향을 주지 않는 시각적 일관성 문제로, 높이 동기화보다 우선순위가 낮다.
-- `match_ready`/`match_start`/`word_cleared`/`word_missed`/`state_sync`의 필드명은 본 문서(§6.3)
-  표와 아래 예시가 유일한 정본이다.
-
-#### 추가 갱신 (2026-08-11) — `tier` → `keystrokes`
-
-`word-bank.ts`(`#73`, PR #86) 구현 과정에서 단어 난이도를 음절 수 기반 3티어(easy/medium/hard)
-대신 **2벌식 키보드 실제 타건 횟수**(`keystrokes: number`)로 재정의했다. `word_spawn`/`state_sync`의
-`tier` 필드는 `keystrokes`로 교체됐다 — 상세 근거와 낙하 시간·데미지 계산식은 `GAME_DESIGN.md`
-§3.2/§3.4~3.6 참고 (`#87`).
+> `player_eliminated`, `players: PlayerPublic[]`, `targetUserId`, `Record<userId, number>` 등
+> 이전 버전 이 문서에 있던 필드/이벤트는 **실제로 구현된 적이 없다** — N인 확장(`backend#136`)
+> 시점에 다시 설계한다.
 
 #### `word_spawn` payload 예시
 
@@ -349,67 +331,67 @@ Redis 세션 키: `game:acidroom:{roomId}` (TTL: **1800s(30분)** — 매치 최
   "keystrokes": 8,
   "lane": 2,
   "fallDurationMs": 4900,
-  "spawnedAt": "2026-07-19T10:00:03.120Z"
+  "spawnedAt": "2026-07-19T10:00:03.120Z",
+  "landAt": "2026-07-19T10:00:08.020Z",
+  "damage": 9
 }
 ```
 
-`lane`은 `0`부터 `LANE_COUNT - 1`(MVP 기준 5개 레인, 0~4) 사이의 정수다. 서버는 스폰 시점에 현재
-낙하 중인 단어들과 레인이 겹치지 않도록 우선 배정하되, 모든 레인이 사용 중이면 임의의 레인에 배정한다
-(짧게 겹쳐 보일 수 있으나 판정은 텍스트 기준이라 게임 결과에는 영향 없음).
+`lane`은 `0`부터 `LANE_COUNT - 1` 사이의 정수다. 서버는 스폰 시점에 현재 낙하 중인 단어들과
+레인이 겹치지 않도록 우선 배정하되, 모든 레인이 사용 중이면 임의의 레인에 배정한다(판정은 텍스트
+기준이라 게임 결과에는 영향 없음).
 
-#### `word_cleared` / `word_missed` / `player_eliminated` / `match_end` payload 예시 (3인 매치 예시)
+#### `word_cleared` / `word_missed` / `match_end` payload 예시 (1:1)
 
 ```json
 {
   "wordId": "w_7f3a",
   "clearedBy": "user-uuid-A",
-  "targetUserId": "user-uuid-B",
-  "damage": 8,
-  "hp": { "user-uuid-A": 100, "user-uuid-B": 92, "user-uuid-C": 100 }
+  "targetParticipantId": "user-uuid-B",
+  "damage": 9,
+  "hp": { "user-uuid-A": 100, "user-uuid-B": 91 }
 }
 ```
 ```json
 {
   "wordId": "w_9b21",
   "splashDamage": 3,
-  "hp": { "user-uuid-A": 97, "user-uuid-B": 89, "user-uuid-C": 97 }
+  "hp": { "user-uuid-A": 97, "user-uuid-B": 88 }
 }
-```
-```json
-{ "userId": "user-uuid-B", "rank": 3, "remainingPlayers": 2 }
 ```
 ```json
 {
   "roomId": "room-uuid",
   "winnerId": "user-uuid-A",
   "reason": "KO",
-  "finalHp": { "user-uuid-A": 41, "user-uuid-B": 0, "user-uuid-C": 0 },
+  "finalHp": { "user-uuid-A": 41, "user-uuid-B": 0 },
   "ranking": [
-    { "userId": "user-uuid-A", "rank": 1 },
-    { "userId": "user-uuid-C", "rank": 2 },
-    { "userId": "user-uuid-B", "rank": 3 }
-  ]
+    { "participantId": "user-uuid-A", "rank": 1 },
+    { "participantId": "user-uuid-B", "rank": 2 }
+  ],
+  "wordsTyped": { "user-uuid-A": 14, "user-uuid-B": 9 },
+  "durationSec": 97
 }
 ```
 
-#### `state_sync` payload 예시 (재접속 복구, 3인 매치)
+#### `state_sync` payload 예시 (재접속/관전 입장 복구)
 
 ```json
 {
   "roomId": "room-uuid",
-  "hp": { "user-uuid-A": 82, "user-uuid-B": 0, "user-uuid-C": 91 },
+  "participants": [
+    { "participantId": "user-uuid-A", "userId": "user-uuid-A", "nickname": "A", "type": "HUMAN", "hp": 82 },
+    { "participantId": "user-uuid-B", "userId": "user-uuid-B", "nickname": "B", "type": "HUMAN", "hp": 91 }
+  ],
+  "hp": { "user-uuid-A": 82, "user-uuid-B": 91 },
   "activeWords": [
-    { "wordId": "w_c410", "text": "타자", "keystrokes": 4, "lane": 4, "fallDurationMs": 4600, "spawnedAt": "2026-07-19T10:01:10.000Z" }
+    { "wordId": "w_c410", "text": "타자", "keystrokes": 4, "lane": 4, "fallDurationMs": 4600, "spawnedAt": "2026-07-19T10:01:10.000Z", "landAt": "2026-07-19T10:01:14.600Z", "damage": 7, "status": "ACTIVE" }
   ],
   "elapsedMs": 47000,
   "spawnIntervalMs": 1650,
   "now": "2026-07-19T10:01:12.400Z"
 }
 ```
-
-`user-uuid-B`처럼 이미 탈락한 참가자는 `hp` 맵에 `0`으로 남아있다 — 재접속한 클라이언트가 "이미
-탈락한 참가자"를 구분해서 그릴 수 있게 하기 위함이며, 탈락자 자체는 `players` 배열에서 제거되지
-않는다(관전 목적으로 계속 방에 남아있음, §3.1).
 
 #### 레이스 컨디션 & 재접속 처리
 
@@ -418,63 +400,50 @@ Redis 세션 키: `game:acidroom:{roomId}` (TTL: **1800s(30분)** — 매치 최
   > 이 순서 보장은 **백엔드 인스턴스 1대** 기준이다. Socket.io를 여러 인스턴스로 수평 확장할 경우
   > Redis adapter로 브로드캐스트해도 같은 방의 참가자들이 서로 다른 인스턴스에 붙어있으면 판정
   > 순서가 보장되지 않는다 — 확장 시 방 단위 sticky 라우팅 또는 Redis 기반 분산 락이 필요하다.
-- `disconnect` 시 30초 유예: 방 유지 + 나머지 참가자에게 `opponent_disconnected` 알림. 유예 내
-  `join_room` 재전송 시 `state_sync`로 복구. 유예 만료 시 해당 참가자는 즉시 탈락 처리되어
-  `player_eliminated`가 발송되고, 그 결과 생존자가 1명이 되면 `match_end{reason:'FORFEIT'}`, 2명
-  이상이면 매치가 계속 진행된다.
+- `disconnect` 시 유예: 방 유지 + 상대방에게 `opponent_disconnected` 알림. 유예 내 `join_room`
+  재전송 시 `state_sync`로 복구. 유예 만료 시 `match_end{reason:'FORFEIT'}`.
+- 두 플레이어가 `join_room`을 거의 동시에 보내면 서버가 방별로 join 처리를 직렬화해 레이스를
+  방지한다(`backend#144`). 클라이언트도 `match_ready`/`state_sync`를 받을 때까지 `join_room`을
+  주기적으로 재전송하는 자가복구 로직을 둔다(`frontend`, `backend#144` 대응).
 
-#### 게임 흐름 시퀀스 (3인 매치 예시)
+#### 게임 흐름 시퀀스 (1:1)
 
 ```mermaid
 sequenceDiagram
-    participant C1 as Client A (Host)
-    participant C2 as Client B
-    participant C3 as Client C
+    participant A as Client A (Host)
+    participant B as Client B (Guest)
     participant G as AcidRainGateway
     participant S as AcidRainService
     participant R as Redis
 
-    Note over C1,C3: 로비에서 GAME_START 핸드오프 후 /game 소켓 연결
-    C1->>G: CONNECT /game (JWT)
-    C2->>G: CONNECT /game (JWT)
-    C3->>G: CONNECT /game (JWT)
-    C1->>G: join_room { roomId }
-    C2->>G: join_room { roomId }
-    C3->>G: join_room { roomId }
+    Note over A,B: 로비에서 GAME_START 핸드오프 후 /game 소켓 연결
+    A->>G: CONNECT /game (JWT)
+    B->>G: CONNECT /game (JWT)
+    A->>G: join_room { roomId }
+    B->>G: join_room { roomId }
     G->>R: getRoom(roomId)
-    G->>C1: match_ready { players: [A,B,C] }
-    G->>C2: match_ready { players: [A,B,C] }
-    G->>C3: match_ready { players: [A,B,C] }
-    G->>C1: match_start { startAt, now, initialHp }
-    G->>C2: match_start { startAt, now, initialHp }
-    G->>C3: match_start { startAt, now, initialHp }
+    G->>A: match_ready { participants: [A,B] }
+    G->>B: match_ready { participants: [A,B] }
+    G->>A: match_start { startAt, now, initialHp }
+    G->>B: match_start { startAt, now, initialHp }
 
     loop 스폰 루프 (서버 타이머)
         S->>R: 다음 단어 스폰 + 상태 저장
-        G->>C1: word_spawn { wordId, text, ... }
-        G->>C2: word_spawn { wordId, text, ... }
-        G->>C3: word_spawn { wordId, text, ... }
+        G->>A: word_spawn { wordId, text, ... }
+        G->>B: word_spawn { wordId, text, ... }
     end
 
-    C1->>G: word_submit { roomId, wordId, text, clientTs }
-    G->>S: judge(roomId, userId, wordId, text)
-    S->>S: 데미지 대상(targetUserId) 무작위 선정 (B 또는 C 중 1인, 예: B)
+    A->>G: word_submit { roomId, wordId, text, clientTs, attemptId }
+    G->>S: judge(roomId, userId, wordId, text, attemptId)
     S->>R: 상태 갱신 (HP, cleared 표시)
-    G->>C1: word_cleared { wordId, clearedBy: A, targetUserId: B, damage, hp }
-    G->>C2: word_cleared { wordId, clearedBy: A, targetUserId: B, damage, hp }
-    G->>C3: word_cleared { wordId, clearedBy: A, targetUserId: B, damage, hp }
-    C2->>G: word_submit { roomId, wordId, text }
-    G->>C2: submit_rejected { wordId, reason: ALREADY_CLEARED }
+    G->>A: word_cleared { wordId, clearedBy: A, targetParticipantId: B, damage, hp }
+    G->>B: word_cleared { wordId, clearedBy: A, targetParticipantId: B, damage, hp }
+    B->>G: word_submit { roomId, wordId, text, clientTs, attemptId }
+    G->>B: submit_rejected { wordId, reason: ALREADY_CLEARED }
 
-    Note over S: B의 HP가 0 이하가 됨 (연속 데미지 누적)
-    G->>C1: player_eliminated { userId: B, rank: 3, remainingPlayers: 2 }
-    G->>C2: player_eliminated { userId: B, rank: 3, remainingPlayers: 2 }
-    G->>C3: player_eliminated { userId: B, rank: 3, remainingPlayers: 2 }
-
-    Note over S: 남은 생존자(A, C) 중 한쪽 HP <= 0 또는 180초 경과 시
-    G->>C1: match_end { winnerId, reason, finalHp, ranking }
-    G->>C2: match_end { winnerId, reason, finalHp, ranking }
-    G->>C3: match_end { winnerId, reason, finalHp, ranking }
+    Note over S: B의 HP가 0 이하 또는 180초 경과
+    G->>A: match_end { winnerId, reason, finalHp, ranking, wordsTyped, durationSec }
+    G->>B: match_end { winnerId, reason, finalHp, ranking, wordsTyped, durationSec }
     S->>R: MatchHistory 저장 후 세션 삭제
 ```
 
@@ -502,7 +471,7 @@ sequenceDiagram
 }
 ```
 
-### 6.5 구현 상태 (2026-08-11 기준)
+### 6.5 구현 상태 (2026-08-12 기준)
 
 **1:1 버전** 이벤트 계약은 **최종 확정 및 구현 완료**(위 "계약 확정 노트" 참고, `lane` 필드 추가
 포함). 아래 표의 항목들은 모두 이 1:1 구현을 가리킨다.
@@ -517,18 +486,25 @@ sequenceDiagram
 | 프론트엔드 이벤트 계약(`useAcidRainSocket.ts`, `types/acidRain.ts`) | **완료** — PR #45 머지됨 (`transcendence_frontend#40`, `#41`) |
 | 로비의 룸 관리 로직(`createRoom`/`joinRoom`/`setReady` 등) | 유지 — 로비가 의존하는 범용 로직. `#72`에서 `characterId` 파라미터 제거, `PlayerSession.ready` 필드로 정식 타입화(기존 `(room as any).hostReady` 캐스트 제거) |
 
-**2~4인 배틀로얄 구현 범위** — `transcendence_deploy#91`(EPIC). 위 1:1 구현 항목들을 아래 현재
-계약(§0.1/§6.3의 `players[]`, `player_eliminated`, `Record<userId,…>` 기반)에 맞춰 재작성하는 단계.
+**AI/N인 확장** — 위 `transcendence_deploy#91`/`#92`(2026-07 시점 초기 설계)는 실제로 이 모양대로
+구현되지 않았다. 실제로 진행된/진행 중인 확장은 다음과 같다(2026-08-12 기준, `transcendence_backend#91`
+EPIC 아래):
 
 | 항목 | 현재 상태 |
 |---|---|
-| Room Object/`players[]`, 배틀로얄 규칙(§0.1, §6.3, `GAME_DESIGN.md` §1/§3.1/§3.6/§3.9) | **설계 확정** — 본 문서(`transcendence_deploy#92`) |
-| DB 마이그레이션(`MatchHistory` → N인 참가자 조인 테이블) | 구현 예정 — `transcendence_backend#93` |
-| `AcidRainService`/`AcidRainGateway`를 `players[]` 기반으로 재작성 | 구현 예정 — `transcendence_backend#94` |
-| 로비 룸 모델 확장(최대 4명) | 구현 예정 — `transcendence_backend#95` |
-| 전적 통계 API N인 매치 대응 | 구현 예정 — `transcendence_backend#96` |
-| 프론트엔드 `Room`/`RoomPlayer`/`useAcidRainSocket`/`WaitingRoomPage`/`GameBoardPage` | 구현 예정 — `transcendence_frontend#46`~`#49` |
-| REST 방 엔드포인트(`POST rooms`, `POST rooms/:id/join` 등) | **완료** — PR #84에서 `#72`와 함께 제거됨 (`transcendence_backend#78`) |
+| 참가자 계약을 HUMAN/AI 공통 표현(`participants[]`, `HpByParticipantId`)으로 정렬 | **완료** — `backend#109`/PR #138(`backend#144`/`#145`로 후속 버그 수정) |
+| AI 연습전(로비 전용, PvP 랭킹과 분리) 세션 생성 | **완료** — `backend#106`/PR #142 |
+| AI 순수 Player Model/난이도 변환 | 진행 예정 — `backend#100` |
+| AI Human-like Executor/Scheduler | 진행 예정 — `backend#105` |
+| AI State Evaluator/목표 선택 | **`backend#136`(아래)에 의존, 대기 중** — `backend#107` |
+| 전략형 다중 `ACTIVE` 단어 엔진(2~4인 PvP와 AI 1:1이 공통 판정 경로 사용) | **진행 중** — `backend#136` |
+| 통합 배포 검증(3~4인 동시접속 시나리오) | `backend#136` 대기 중 — `deploy#68` |
+| 관전 모드(§6.7, 참가자 수 무관) | 구현 중 — `deploy#70` |
+
+이 문서의 §6.3/§6.7은 `backend#136`이 내부 세션 모델(`AcidRainSession.host`/`.guest`)을
+`participants[]` 배열 기반으로 재작성하더라도, 외부로 노출되는 이벤트 계약 자체는 바뀌지 않도록
+설계돼 있다(변환 헬퍼를 통해서만 payload를 만들기 때문). `backend#136` 완료 후 이 절의 갱신은
+"몇 명까지 참가 가능한가" 정도의 문구 수정만 필요할 것으로 예상된다.
 
 ### 6.6 프론트엔드 구현 파일 (계획)
 
@@ -539,3 +515,99 @@ sequenceDiagram
 | `src/types/acidRain.ts` | §6.3 이벤트 페이로드 타입 + Server/ClientToServerEvents 맵 | 신규 |
 | `src/pages/GameBoardPage.tsx` | 게임 보드 페이지, `/game/:roomId` — 단어 낙하 렌더링 + 입력창 + HP 바 | 재작성 |
 | `src/pages/GameComingSoonPage.tsx` | 배포 공백을 메우는 placeholder | 신규(임시) |
+| `src/pages/SpectateBoardPage.tsx` | 관전 전용 읽기 화면, `/spectate/:roomId` (§6.7) | 신규 — `deploy#70` |
+
+### 6.7 관전 모드 (Spectator Mode) — `deploy#70`
+
+이미 `IN_PROGRESS`인 방을 제3자가 읽기 전용으로 지켜볼 수 있는 기능이다. 관전자는 절대
+`room.players`나 매치 세션(`AcidRainSession.host`/`.guest`)에 등록되지 않는다 — 소켓 룸
+(`game:{roomId}`)에만 입장해 같은 브로드캐스트를 받는다. 이렇게 분리하는 이유는 연결 종료 시
+FORFEIT 판정 로직(§6.3 `leave_room`/disconnect 처리)이 `room.players` 소속 여부로 승패를
+가르기 때문 — 관전자를 여기 섞으면 소켓이 끊길 때 엉뚱하게 상대를 승자 처리하는 버그가 생긴다.
+
+#### 클라이언트 → 서버
+
+| Event | Payload | Description |
+|---|---|---|
+| `spectate_room` | `{ roomId: string }` | 관전 입장. 세션이 `IN_PROGRESS`가 아니면(대기 중/이미 종료) 거부됨. 참가자 인원수 제약(§6.3 2인 검증)과 무관 |
+| `leave_spectate` | `{ roomId: string }` | 관전 종료(인앱 이동 등 명시적 종료). 소켓 disconnect를 기다리지 않고 즉시 소켓 룸을 나가고 `spectatingRoomId`를 정리한다 |
+
+`word_submit`을 관전자가 보내면 게이트웨이가 `spectatingRoomId`가 설정된 소켓임을 확인하고
+즉시 거부한다(서비스 레벨 `isParticipant` 검증이 최종 방어선이지만, 게이트웨이에서 먼저 걸러
+불필요한 재전송 기록을 남기지 않는다).
+
+#### 서버 → 클라이언트
+
+관전자는 `spectate_room` 응답으로 최초 1회 `state_sync`(§6.3, 현재는 `participants[]`/
+`HpByParticipantId` 기준)를 받고, 이후 별도 처리 없이 같은 소켓 룸에 브로드캐스트되는
+`word_spawn`/`word_cleared`/`word_missed`/`match_end`/`opponent_disconnected`/
+`opponent_reconnected`를 참가자와 동일하게 그대로 수신한다. 관전자 전용 이벤트는 없다.
+
+- 세션이 없거나(`WAITING`/`FINISHED`) `spectate_room` 요청 시점에 관전 불가능하면
+  `error { message: 'Room is not currently spectatable' }`로 거부.
+
+#### 관전자 채팅 접근 (`AcidRainGateway` → `ChatGateway`)
+
+관전자는 해당 방의 채팅(`/chat` 네임스페이스, `ChatPanel` 컴포넌트)을 참가자와 동일하게
+읽고 쓸 수 있다 — 채팅 자체는 `AcidRainGateway`의 소켓 룸 멤버십과 무관하게 별도 인증만으로
+누구나 특정 `roomId`를 대상으로 열 수 있으므로, 관전 여부와 상관없이 접근을 막을 이유가 없다.
+대신 다른 참가자/관전자가 상황을 알 수 있도록 `AcidRainGateway`가 `ChatGateway.sendSystemMessage
+(roomId, content)`를 직접 호출해 다음 두 시점에 시스템 메시지를 채팅방에 남긴다:
+
+- `spectate_room` 처리 성공 직후 — `"{닉네임} 님이 관전을 시작했습니다."`
+- `leave_spectate` 처리 시, 그리고 관전 중 소켓이 abrupt 하게 끊겼을 때(`handleDisconnect`에서
+  `spectatingRoomId`가 설정돼 있는 경우) — `"{닉네임} 님이 관전을 종료했습니다."`
+
+참가자 입장/퇴장에는 이런 시스템 메시지가 없다(기존 §6.3 흐름은 변경하지 않음) — 이 메시지는
+관전자 전용으로 새로 추가된 것이다.
+
+#### 관전 가능한 방 목록 (Lobby, raw-ws `/ws/lobby`)
+
+기존 §0의 `LIST_ROOMS`/`ROOM_LIST`는 `WAITING` 상태 방만 반환한다(관전 대상은 `IN_GAME`이라
+의미상 다른 목록). 별도 요청/응답 쌍을 추가한다:
+
+| Event | Payload | Description |
+|---|---|---|
+| `LIST_SPECTATABLE_ROOMS` (C→S) | `{}` | 현재 관전 가능한(`IN_GAME`) 방 목록 요청 |
+| `SPECTATABLE_ROOM_LIST` (S→C) | `{ rooms: Room[] }` | §0.1 `Room` 객체와 동일한 모양, `status: 'IN_GAME'`인 방만 포함 |
+
+#### 시퀀스
+
+```mermaid
+sequenceDiagram
+    participant A as Client A (Player)
+    participant B as Client B (Player)
+    participant C as Client C (Spectator)
+    participant G as AcidRainGateway
+    participant S as AcidRainService
+    participant Ch as ChatGateway
+
+    Note over A,B: 매치 이미 IN_PROGRESS
+    C->>G: spectate_room { roomId }
+    G->>S: getSpectatorSnapshot(roomId)
+    S-->>G: state_sync payload (participants[], hp, activeWords, ...)
+    G->>C: state_sync { ... }
+    G->>Ch: sendSystemMessage(roomId, "C 님이 관전을 시작했습니다.")
+    Ch-->>A: receive_message (system)
+    Ch-->>B: receive_message (system)
+    G-->>C: (이후 word_spawn/word_cleared/word_missed/match_end 등 룸 브로드캐스트 자동 수신)
+
+    A->>G: word_submit { roomId, wordId, text, clientTs, attemptId }
+    G->>S: judge(...)
+    G->>A: word_cleared { ... }
+    G->>B: word_cleared { ... }
+    G->>C: word_cleared { ... }
+
+    C->>Ch: send_message { roomId, content }
+    Ch-->>A: receive_message
+    Ch-->>B: receive_message
+
+    Note over A,B: 매치 종료
+    G->>A: match_end { ... }
+    G->>B: match_end { ... }
+    G->>C: match_end { ... }
+
+    C->>G: leave_spectate { roomId }
+    G->>Ch: sendSystemMessage(roomId, "C 님이 관전을 종료했습니다.")
+    Note over C: 관전자는 room.players/세션에 등록된 적 없으므로 소켓 룸 멤버십 정리만 필요
+```
