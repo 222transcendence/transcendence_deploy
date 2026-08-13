@@ -290,104 +290,25 @@ All endpoints below are prefixed with `/api/chat` and require **JWT Bearer Token
     - `400`: 유효성 검사 실패 (닉네임 길이 초과 등)
     - `409`: 닉네임 중복 발생 (`E_CONFLICT`)
 
-### [POST] /api/auth/signup
-- **Description**: 신규 사용자를 등록함.
-- **Request Body**:
-    ```json
-    {
-      "email": "user@example.com",
-      "nickname": "user_nickname",
-      "password": "user_password"
-    }
-    ```
-- **Success Response (201 Created)**:
-    ```json
-    {
-      "timestamp": "2026-06-09T12:00:00Z",
-      "status": 201,
-      "data": {
-        "id": "uuid-string",
-        "email": "user@example.com",
-        "nickname": "user_nickname",
-        "avatar": "default_avatar.png",
-        "status": "OFFLINE",
-        "wins": 0,
-        "losses": 0,
-        "createdAt": "2026-06-09T12:00:00Z",
-        "updatedAt": "2026-06-09T12:00:00Z"
-      },
-      "error": null
-    }
-    ```
-
-### [POST] /api/auth/login
-- **Description**: 사용자 인증을 진행하고 JWT 토큰을 발급함.
-- **Request Body**:
-    ```json
-    {
-      "email": "user@example.com",
-      "password": "user_password"
-    }
-    ```
-- **Success Response (200 OK)**:
-    ```json
-    {
-      "timestamp": "2026-06-09T12:00:00Z",
-      "status": 200,
-      "data": {
-        "accessToken": "jwt-access-token",
-        "refreshToken": "jwt-refresh-token",
-        "user": {
-          "id": "uuid-string",
-          "email": "user@example.com",
-          "nickname": "user_nickname",
-          "avatar": "default_avatar.png",
-          "status": "ONLINE"
-        }
-      },
-      "error": null
-    }
-    ```
-
-### [POST] /api/auth/refresh
-- **Description**: Refresh 토큰으로 Access 토큰을 갱신함.
-- **Request Body**:
-    ```json
-    {
-      "refreshToken": "jwt-refresh-token"
-    }
-    ```
-- **Success Response (200 OK)**:
-    ```json
-    {
-      "timestamp": "2026-06-09T12:00:00Z",
-      "status": 200,
-      "data": {
-        "accessToken": "new-jwt-access-token"
-      },
-      "error": null
-    }
-    ```
-
-### [POST] /api/auth/logout
-- **Description**: 로그아웃을 진행하고 Refresh 토큰을 만료시킴.
-- **Authentication**: JWT 필수
-- **Success Response (200 OK)**:
-    ```json
-    {
-      "timestamp": "2026-06-09T12:00:00Z",
-      "status": 200,
-      "data": {
-        "success": true
-      },
-      "error": null
-    }
-    ```
+> `/api/auth/signup`·`/api/auth/login`·`/api/auth/refresh`·`/api/auth/logout`은 위
+> "Authentication APIs" 절에 이미 정의돼 있다 — 이 문서에 같은 엔드포인트가 중복 정의돼 있던
+> 것을 정리했다.
 
 ## 3. Security Requirements
-- **JWT Authentication**: 모든 API 요청 헤더에 \`Authorization: Bearer <token>\` 필수.
-- **CSRF Protection**: 세션 기반 인증 사용 시 Django의 CSRF 미들웨어 필수 적용.
+- **JWT Authentication**: 모든 API 요청 헤더에 \`Authorization: Bearer <token>\` 필수 —
+  `JwtAuthGuard`(`src/auth/guards/jwt-auth.guard.ts`), 컨트롤러에서 `@CurrentUser()` 데코레이터로
+  인증된 유저를 꺼낸다.
 - **CORS Policy**: 허용된 도메인(프론트엔드 URL)에서의 접근만 허용.
+
+> Django는 이 프로젝트에 존재한 적이 없다(NestJS 단일 스택) — 위 "Django의 CSRF 미들웨어" 서술은
+> 완전히 허구였으므로 삭제했다. 세션 기반 인증 자체를 쓰지 않고 순수 JWT Bearer 토큰만 사용하므로
+> CSRF 미들웨어가 애초에 불필요하다.
+
+## 3.1 `/metrics` — Prometheus 스크레이프 엔드포인트
+
+`src/metrics/metrics.controller.ts` (`@Controller()`, 접두사 없음 — 다른 API처럼 `/api/`가
+붙지 않는다). 인증 없이 Prometheus 익스포지션 포맷의 메트릭을 반환한다. `SYSTEM_ARCHITECTURE.md`의
+모니터링 스택 참고.
 
 ## 4. Error Codes Mapping
 | Code | Meaning | HTTP Status |
@@ -469,24 +390,33 @@ All endpoints below are prefixed with `/api/chat` and require **JWT Bearer Token
 
 ---
 
-## Friends API (P2-08)
+## Friends API (`src/friend/friend.controller.ts`, 전체 `@UseGuards(JwtAuthGuard)`)
 
-> Auth merge 전 임시 처리: current user 식별은 `x-user-id` 헤더를 사용함.
+> **정정 (2026-08-14)**: 예전 설계 메모는 "Auth merge 전 임시 처리로 `x-user-id` 헤더를 쓴다"고
+> 적어뒀지만, 실제 컨트롤러는 처음부터 다른 API들과 동일하게 `JwtAuthGuard` +
+> `@CurrentUser()` 데코레이터를 쓴다 — `x-user-id` 헤더 처리는 코드에 존재한 적이 없다.
+
+### [POST] /api/friends/by-nickname/{nickname}
+- **Description**: 닉네임으로 친구 요청 생성. **설계 메모에 없던 엔드포인트** — 실제로는
+  유저 ID가 아니라 닉네임으로 찾아 요청하는 이 경로가 프론트(`LobbyPage.tsx` 친구 추가 UI)의
+  기본 진입점이다.
+- **Path Params**: `nickname`
+- **Auth**: JWT 필수(`@CurrentUser()`로 요청자 식별)
 
 ### [POST] /api/friends/{userId}
-- **Description**: 친구 요청 생성
+- **Description**: 유저 ID로 친구 요청 생성
 - **Path Params**: `userId` (요청 대상 유저 id)
-- **Headers**: `x-user-id` (임시 current user id)
+- **Auth**: JWT 필수
 - **Behavior**:
   - 자기 자신 요청 방지
   - 대상 유저 존재 검증
-  - 양방향 중복/PENDING 요청 방지
-  - 기존 `ACCEPTED` 관계 존재 시 `409`
+  - 양방향 중복/PENDING 요청 방지 → `409 Conflict('Friend request already exists')`
+  - 기존 `ACCEPTED` 관계 존재 시 `409 Conflict('Already friends')`
 
 ### [PATCH] /api/friends/{requestId}
 - **Description**: 친구 요청 수락/거절
 - **Path Params**: `requestId`
-- **Headers**: `x-user-id` (임시 current user id)
+- **Auth**: JWT 필수
 - **Body**:
 ```json
 { "action": "accept" }
@@ -504,18 +434,26 @@ All endpoints below are prefixed with `/api/chat` and require **JWT Bearer Token
 ### [DELETE] /api/friends/{userId}
 - **Description**: `ACCEPTED` 친구 관계 삭제
 - **Path Params**: `userId` (삭제 대상 친구 유저 id)
-- **Headers**: `x-user-id` (임시 current user id)
+- **Auth**: JWT 필수
+
+### [GET] /api/friends/requests/sent
+- **Description**: 내가 보낸(아직 `PENDING`인) 친구 요청 목록. **설계 메모에 없던 엔드포인트** —
+  게임 중 중복 요청 방지 UI(`WaitingRoomPage.tsx`, `#92`)가 이 API로 대기 중 요청 여부를 미리
+  확인한다.
+- **Auth**: JWT 필수
+
+### [GET] /api/friends/requests
+- **Description**: 내가 받은(아직 `PENDING`인) 친구 요청 목록. **설계 메모에 없던 엔드포인트**.
+- **Auth**: JWT 필수
 
 ### [GET] /api/friends
-- **Description**: 내 친구 목록 조회
-- **Headers**: `x-user-id` (임시 current user id)
+- **Description**: 내 친구 목록 조회(`ACCEPTED`만)
+- **Auth**: JWT 필수
 - **Response Fields (each item)**:
   - `id`
   - `nickname`
   - `status` (User 엔티티 status 필드 기반)
 
-### Out of Scope
-- JWT/Guard 기반 인증 처리
-- Redis/WebSocket/session 기반 실시간 온라인 상태 동기화
-- 별도 거절 상태(enum `REJECTED`) 추가
-- 금지 endpoint (`/friends/request`, `/friends/accept`, `/friends/reject`) 도입
+### 실제로 없는 것
+- 별도 거절 상태(enum `REJECTED`) — 거절은 `PENDING` row 삭제로 처리한다.
+- `FriendStatus`에 `BLOCKED`는 없다(`PENDING`/`ACCEPTED`뿐, `DATABASE_MODELING.md` 참고).
