@@ -3,9 +3,10 @@
 ## 1. Advanced ER Diagram
 \`\`\`mermaid
 erDiagram
-    USER ||--o{ MATCH_HISTORY : participates
+    USER ||--o{ MATCH_HISTORY : "hosts (legacy 2인)"
+    USER ||--o{ MATCH_PARTICIPANT : plays
     USER ||--o{ FRIENDSHIP : relates
-    MATCH_HISTORY ||--o{ MATCH_ACTION_LOG : records
+    MATCH_HISTORY ||--o{ MATCH_PARTICIPANT : has
 
     USER {
         uuid id PK
@@ -21,42 +22,108 @@ erDiagram
     }
 
     MATCH_HISTORY {
-        bigint id PK
-        int host_id FK
-        int guest_id FK
-        int winner_id FK
-        enum match_type "RANKED, NORMAL"
-        int elo_change
-        timestamp started_at
-        timestamp ended_at
+        uuid id PK
+        uuid hostUserId FK "NULLABLE, 2인 매치 하위호환"
+        uuid guestUserId FK "NULLABLE, 2인 매치 하위호환"
+        uuid winnerId FK "NULLABLE"
+        enum mode "PVP, AI_PRACTICE"
+        int roundsPlayed
+        jsonb matchData "요약 통계"
+        timestamp createdAt
+    }
+    %% 실제 구현에는 elo_change/match_type(RANKED,NORMAL) 컬럼이 없다 — 랭킹은 User.wins/losses
+    %% 승률 기반이고, ELO/레이팅 시스템은 구현된 적이 없다.
+
+    MATCH_PARTICIPANT {
+        uuid id PK
+        uuid matchId FK
+        uuid userId FK
+        int finalHp
+        int rank "1=우승, 공동순위 허용"
+    }
+    %% N인(2~4) 매치의 참가자별 결과 — backend#91. DATABASE_DESIGN.md 참고.
+
+    WORD_ATTEMPT_RECORD {
+        uuid id PK
+        uuid matchId
+        string participantId
+        uuid userId "NULLABLE, AI는 없음"
+        string wordId
+        int attemptNo
+        enum result "CORRECT, WRONG, CORRECT_AFTER_CORRECTION, GIVE_UP, MISSED, ALREADY_CLEARED"
+        varchar submittedText "NULLABLE"
     }
 
-    MATCH_ACTION_LOG {
-        bigint id PK
-        int match_id FK
-        int turn_number
-        jsonb action_data "Optimized JSON storage"
+    KEYSTROKE_RECORD {
+        uuid id PK
+        uuid matchId
+        string participantId
+        string wordId
+        int sequence
+        string inputType "PROGRESS, BACKSPACE, CLEAR"
+        timestamp serverReceivedAt
     }
-    %% 구현 노트(#14): 실제 구현은 위 두 엔티티를 분리하지 않고, MatchHistory.id를 uuid PK로
-    %% 두고 matchData(jsonb) 한 컬럼에 전체 액션 로그를 저장함. 상세: DATABASE_DESIGN.md 참고.
+
+    PARTICIPANT_PERFORMANCE {
+        uuid id PK
+        uuid matchId
+        string participantId
+        uuid userId "NULLABLE"
+        enum participantType "HUMAN, AI"
+        enum mode "PVP, AI_PRACTICE"
+        enum resultStatus "FINISHED, ABORTED, VOID"
+        float typingWpm "NULLABLE"
+        float accuracy "NULLABLE"
+    }
+    %% AI 개인화 파이프라인(AI_OPPONENT_SPEC.md §6.9)이 이 테이블을 조회한다.
+
+    WORD_DICTIONARY {
+        uuid id PK
+        string text "UNIQUE"
+        enum language "ko, en"
+        enum difficulty "easy, normal, hard"
+        int length
+        int keystrokes
+        boolean isActive
+    }
+    %% 단어 은행은 정적 배열이 아니라 실제 DB 테이블이다(backend#72) — 아래 §3 참고.
 
     FRIENDSHIP {
-        int user_a_id FK
-        int user_b_id FK
-        enum status "PENDING, ACCEPTED, BLOCKED"
-        timestamp updated_at
+        uuid id PK
+        uuid requesterId FK
+        uuid receiverId FK
+        enum status "PENDING, ACCEPTED"
+        timestamp updatedAt
     }
+    %% BLOCKED 상태는 없다 — 실제 enum(FriendStatus)은 PENDING/ACCEPTED 둘뿐이며, 거절은 별도
+    %% 상태 없이 PENDING row를 삭제하는 방식으로 처리한다(DATABASE_DESIGN.md 참고).
 \`\`\`
 
 ## 2. Implementation Strategies
+
+> 아래 §2/§3는 애초에 "이렇게 하면 좋다"는 권장 전략 메모이지, 이미 구현됐다는 서술이 아니다.
+> 실제로 구현되지 않은 항목(`version` 낙관적 잠금, 2FA)은 그렇게 명시한다 — 코드에 존재하지
+> 않으므로, 실제로 필요하면 프로젝트 보드에 별도 이슈로 등록해야 한다.
+
 ### 2.1. Concurrency Control
-- **Optimistic Locking**: 게임 결과 기록 시 \`version\` 필드를 활용하여 데이터 충돌 방지.
-- **Transactions**: 매치 종료 시 승리자 보상 및 랭킹 업데이트는 단일 트랜잭션 내에서 처리 (Atomicity 보장).
+- **Optimistic Locking**: (미구현) 게임 결과 기록 시 `version` 필드를 활용해 데이터 충돌을 막는
+  안. `MatchHistory`/`MatchParticipant`에 `@VersionColumn`은 없다 — 매치 종료는
+  `AcidRainService`가 방 단위로 직렬화해서 처리하므로(§6.3 `word_submit` 레이스 처리) 현재는
+  동시 쓰기 충돌 자체가 발생하지 않는 구조다.
+- **Transactions**: 매치 종료 시 참가자 순위/전적 저장은 `saveMatchHistory()`에서 처리한다.
 
 ### 2.2. Storage Optimization
-- **JSONB Usage**: \`MATCH_ACTION_LOG\`에서 \`jsonb\` 타입을 사용하여 필드 내 데이터에 대한 인덱싱 가능.
-- **Partitioning**: \`MATCH_ACTION_LOG\`가 거대해질 경우 \`match_id\` 혹은 날짜별 파티셔닝 적용 고려.
+- **JSONB Usage**: `MatchHistory.matchData`가 `jsonb` 타입이다.
+- **Partitioning**: `WordAttemptRecord`/`KeystrokeRecord`(§1)가 매치마다 다량의 행을 쌓는 원장
+  테이블이라 파티셔닝 후보다 — 아직 적용되지 않았다.
 
 ## 3. Security
-- **Data at Rest**: 민감 정보(2FA Secret 등)는 애플리케이션 레벨에서 암호화 후 저장.
-- **GDPR Compliance**: 유저 탈퇴 시 식별 정보(username 등) 비식별화 처리 프로세스 수립.
+- **Data at Rest**: (미구현) 2FA는 현재 코드에 존재하지 않는다 — 실제 인증은 JWT 기반
+  이메일/비밀번호와 OAuth뿐이다(`API_SPECIFICATION.md` 참고). 2FA를 도입하게 되면 시크릿은
+  애플리케이션 레벨 암호화 후 저장을 권장.
+- **GDPR Compliance**: 비식별화가 아니라 **완전 삭제**로 구현돼 있다 —
+  `UserService.remove()`는 `userRepository.remove(user)`로 행 자체를 하드 삭제한다.
+  `MatchParticipant.user`가 `ON DELETE CASCADE`라 탈퇴한 유저의 참가 기록(그 사람의 순위/HP
+  행)만 함께 삭제된다 — 매치 자체나 다른 참가자의 기록은 남는다. `MatchHistory.hostUser`/
+  `guestUser`(2인 매치 하위호환 컬럼)도 `ON DELETE CASCADE`라, 탈퇴한 유저가 호스트/게스트로
+  기록된 **레거시 2인 매치는 통째로 삭제**된다는 차이가 있다.
