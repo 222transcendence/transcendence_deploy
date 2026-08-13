@@ -1,9 +1,14 @@
 # 산성비 AI 대전 기능 명세서
 
-> 문서 상태: 구현 전 설계안  
-> 기준 브랜치: `transcendence_deploy/dev` (2026-08-03 확인)  
-> 관련 문서: `architecture_design/GAME_DESIGN.md`, `architecture_design/WEBSOCKET_PROTOCOL.md`, `USE_CASES.md`  
+> 문서 상태: **구현 완료, 실제 코드 기준으로 갱신됨** (2026-08-14)  
+> 기준 브랜치: `transcendence_backend/dev` (`backend#106`/`#166`/`#176` 등 AI 개인화 파이프라인까지 포함)  
+> 관련 문서: `architecture_design/GAME_DESIGN.md`, `architecture_design/WEBSOCKET_PROTOCOL.md`(§6.8 `ai_monitor_snapshot`), `USE_CASES.md`  
 > 담당 범위: AI Opponent Major 모듈 및 상시 AI 대전 사용자 흐름
+>
+> §1~5(제품 정의, 범위, 공통 규칙, UX, 유스케이스)는 최초 설계안이 실제 구현과 대체로 일치해
+> 원문을 유지한다. §6(AI 행동 모델)과 §7(서버 구조)은 실제 구현이 설계 당시 예상보다 훨씬
+> 정교한 개인화 파이프라인으로 발전했으므로 코드 기준으로 다시 썼다 — 특히 `PAUSED` 상태/
+> `MatchClock`/30초 재접속 유예는 **실제로 구현된 적이 없다**(아래 UC-AI-05 참고, `backend#161`).
 
 ---
 
@@ -77,19 +82,26 @@ AI Opponent Major 모듈을 충족하기 위해 다음을 보장한다.
 | 난이도 램프 | 경과 시간에 따라 스폰 간격·낙하 속도·단어 구간 증가 |
 | 전략 선택 | 짧은 단어는 성공하기 쉽지만 공격력이 낮고, 긴 단어는 입력 부담이 크지만 공격력이 높음 |
 
-### 3.1 상태 머신
+### 3.1 상태 머신 (실제 구현)
 
 ```text
-CREATING → COUNTDOWN → IN_PROGRESS ↔ PAUSED → FINISHED
-                                    ↘ ABORTED
+CREATING → COUNTDOWN → IN_PROGRESS → FINISHED
 ```
+
+`AcidRainSession.status`의 실제 타입은 `'COUNTDOWN' | 'IN_PROGRESS' | 'FINISHED'` 세 가지뿐이다.
+설계 당시 계획했던 `PAUSED`/`ABORTED` 상태는 **구현되지 않았다** — 사용자 연결이 끊겨도 매치
+시계·스폰 루프·AI는 멈추지 않고 그대로 진행된다(`backend#161`, PvP와 동일 정책). 대신 매치
+결과(`MatchEndReason`: `'KO' | 'TIME_LIMIT' | 'FORFEIT'`)와 별도로, 저장되는 `ResultStatus`
+(`'FINISHED' | 'ABORTED' | 'VOID'`, `participant-performance.entity.ts`)가 있는데 이는 세션
+상태 머신이 아니라 **개인 성능 기록(§6.9)을 population-default 통계에 반영할지 판단하는
+데이터 품질 플래그**다 — `winnerId`가 확정되면 `FINISHED`, 아니면 `ABORTED`로 표시되어 그
+매치의 표본이 통계 계산에서 제외된다.
 
 - `CREATING`: 연습 세션 생성 및 게임 화면 진입 준비
 - `COUNTDOWN`: 3·2·1 카운트다운
-- `IN_PROGRESS`: 스폰, 입력, 판정, HP 변경 진행
-- `PAUSED`: 사용자 연결이 완전히 끊긴 상태에서 연습 일시정지
-- `FINISHED`: 정상 승리·패배·무승부
-- `ABORTED`: 사용자의 명시적 종료, 재접속 제한 초과, 복구 불가
+- `IN_PROGRESS`: 스폰, 입력, 판정, HP 변경 진행. 사용자 연결이 끊겨도 계속 진행되며, 재접속 시
+  `state_sync`로 복구한다(UC-AI-05)
+- `FINISHED`: 승리·패배·무승부로 정상 종료(180초 하드 타임아웃 포함)
 
 ---
 
@@ -226,16 +238,21 @@ AI 실력 선택은 **게임 스테이지 선택이 아니라 상대 AI의 기�
 | 대안 흐름 | **3A** 오타 후 포기 확률에 해당하면 해당 단어를 포기하고 다음 목표를 선택한다.<br><br>**4A** 예상 완료 시각이 바닥 도달 이후이면 제출하지 않고 다른 단어를 탐색한다.<br><br>**5A** 현재 목표가 사용자에 의해 먼저 제거되면 예약 작업을 취소하고 새 목표를 선택한다. |
 | 종료 조건 | AI가 즉시 정답을 제출하지 않고, 난이도별 차이와 인간형 실수를 보이며 정상 게임 규칙을 따른다. |
 
-### UC-AI-05. 사용자 연결 끊김 및 연습 재개
+### UC-AI-05. 사용자 연결 끊김 및 연습 재개 (실제 구현 — 설계 당시의 PAUSED/30초 유예는 폐기됨)
+
+> `backend#161` 결정: 화장실을 다녀오거나 새로고침이 오래 걸리는 정상적인 경우까지 게임에서
+> 쫓아내는 부작용이 있어, PvP·AI 연습전 모두 강제 탈락 유예 타이머를 두지 않기로 했다. 아래는
+> 실제 동작이며, 설계안에 있던 `PAUSED` 상태·`MatchClock`·30초 유예·정지 횟수 제한은 전부
+> 구현되지 않았다.
 
 | 항목 | 내용 |
 |---|---|
 | 유스케이스 이름 | 사용자 연결 끊김 및 연습 재개 |
 | 액터 | 사용자, 서버 |
-| 시작 조건 | AI 대전 세션이 `IN_PROGRESS`이고 사용자의 활성 게임 소켓 수가 0이 됨 |
+| 시작 조건 | AI 대전 세션이 `IN_PROGRESS`이고 사용자 소켓이 끊김 |
 | 트리거 | 네트워크 단절 또는 브라우저 새로고침 |
-| 기본 흐름 | 1. 서버가 세션을 `PAUSED`로 변경한다.<br>2. 단어 스폰, 바닥 판정, AI 입력, 경기 종료 시계를 일시정지한다.<br>3. 30초 재접속 유예를 시작한다.<br>4. 사용자가 유예 시간 내 동일 세션으로 재접속한다.<br>5. 서버가 HP, 활성 단어, 남은 낙하 시간, 남은 경기 시간, 통계를 `state_sync`로 전송한다.<br>6. 3초 재개 카운트다운 후 게임을 계속한다. |
-| 대안 흐름 | **1A** 같은 사용자의 다른 게임 소켓이 남아 있으면 세션을 일시정지하지 않는다.<br><br>**4A** 유예 시간이 만료되면 세션을 `ABORTED`로 종료하고 PvP 승패에는 반영하지 않는다.<br><br>**4B** 경기당 허용된 정지 횟수 또는 누적 정지 시간을 초과하면 세션을 `ABORTED`로 종료한다.<br><br>**5A** 세션 복구에 실패하면 `VOID` 처리하고 오류 안내 후 로비로 이동한다. |
+| 기본 흐름 | 1. 서버는 세션을 일시정지하지 않는다 — 단어 스폰, AI 입력, 경기 종료 시계가 그대로 진행된다.<br>2. AI는 계속 단어를 지우며 진행하고, 낙하한 단어의 스플래시 데미지도 계속 적용된다(끊긴 사용자도 계속 맞을 수 있다 — 자연스러운 페널티).<br>3. 사용자가 아무 때나 같은 `roomId`로 `join_room`을 재전송하면 서버가 `state_sync`(HP, 활성 단어, 남은 시간)로 즉시 복구시켜준다.<br>4. 재접속 시 카운트다운 없이 바로 진행 중인 매치에 합류한다. |
+| 대안 흐름 | **1A** 매치 자체가 `MATCH_DURATION_MS`(180초) 하드 타임아웃을 가지므로, 사용자가 끝까지 재접속하지 않아도 매치는 정상적으로 `TIME_LIMIT` 또는 `KO`로 종료된다.<br><br>**4A** 재접속하지 못한 채 매치가 끝나면 결과는 `winnerId` 확정 여부에 따라 `FINISHED`/`ABORTED`로 저장되고(§3.1), `ABORTED`는 population-default 통계(§6.9)에서 제외된다. |
 | 종료 조건 | 같은 상태에서 정상 재개되거나 경쟁 기록에 영향을 주지 않는 중단 결과가 생성된다. |
 
 ### UC-AI-06. AI 대전 정상 종료 및 결과 확인
@@ -288,141 +305,140 @@ AI 실력 선택은 **게임 스테이지 선택이 아니라 상대 AI의 기�
 
 ---
 
-## 6. AI 행동 모델 및 운영값
+## 6. AI 행동 모델 및 운영값 (실제 구현 기준)
+
+> 설계 당시에는 `perceptionMs`/`syllablesPerSecond`/`typoRate` 등을 난이도별 고정 상수 3벌로
+> 두는 안이었지만, 실제 구현은 한 단계 더 나아가 **"실력 프로필(스킬) × 난이도 보정치"** 구조로
+> 갔다 — 스킬 프로필 자체가 population-default 통계나 실제 유저의 과거 성적으로 개인화될 수
+> 있기 때문이다(§6.9). 관련 코드: `src/game/player-model.ts`,
+> `src/game/acid-rain/ai/ai-execution-profile.ts`, `ai-executor.ts`, `state-evaluator.ts`.
 
 ### 6.1 기본 원칙
 
 - AI는 서버 내부 정답을 알고 있어도 즉시 제출하지 않는다.
-- AI는 한 번에 하나의 단어만 실제로 타이핑한다.
-- 난이도가 높을수록 더 많은 활성 단어를 관찰하고 더 좋은 목표를 선택할 수 있지만, 동시 타이핑은 하지 않는다.
-- AI는 HP를 직접 변경하지 않는다.
-- AI의 정답 제출은 사람과 같은 공통 판정 함수로 처리한다.
-- AI의 난수는 시드 기반이며 테스트에서 재현 가능해야 한다.
+- AI는 한 번에 하나의 단어만 실제로 타이핑한다(`AiExecutionTask` 1개).
+- AI는 HP를 직접 변경하지 않는다 — 정답 제출은 사람과 동일한 `AcidRainService.submitWord()` 공통
+  판정 함수를 통과한다.
+- AI의 난수(`RandomSource`)와 시계(`Clock`)는 테스트에서 주입 가능하며, 시드를 고정하면 결정적으로
+  재현된다(`ai-scheduler.spec.ts` 등에서 사용).
 
-### 6.2 제출 지연
+### 6.2 실력 프로필 → 실행 프로필 변환
 
-```text
-submitDelayMs = simulatedDeliveryMs
-              + perceptionMs
-              + typingMs
-              + correctionMs
-              + simulatedSubmitMs
-              + jitterMs
+```ts
+// src/game/player-model.ts
+DEFAULT_PLAYER_SKILL = { wpm: 45, accuracy: 0.92, reactionTimeMs: 650, sampleCount: 0, confidence: 0 };
+
+DIFFICULTY_MODIFIERS = {
+  BEGINNER: { speed: 0.85, accuracy: -0.08, reaction: 1.15 },
+  NORMAL:   { speed: 1.00, accuracy:  0.00, reaction: 1.00 },
+  HARD:     { speed: 1.15, accuracy:  0.08, reaction: 0.85 },
+};
+
+function toAiExecutionProfile(skill, difficulty) {
+  return {
+    typingWpm:      clamp(skill.wpm * modifier.speed, 20..140),
+    accuracy:       clamp(skill.accuracy + modifier.accuracy, 0.7..0.98),
+    reactionDelayMs: clamp(skill.reactionTimeMs * modifier.reaction, 250..2000),
+  };
+}
 ```
 
-- `simulatedDeliveryMs`: 서버 내부 AI가 사람보다 먼저 단어를 보는 이점을 줄이는 가상 전달 지연
-- `perceptionMs`: 단어 인지 시간
-- `typingMs`: 단어 입력 시간
-- `correctionMs`: 오타 수정 시간
-- `simulatedSubmitMs`: 사람의 네트워크 제출 시간을 흉내 내는 가상 지연
-- `jitterMs`: 매 단어 달라지는 편차
+`skill`(`PlayerSkillProfile`)은 기본값(`DEFAULT_PLAYER_SKILL`)이거나, §6.9의 개인화 파이프라인이
+실제 유저의 최근 매치 표본으로 산출한 값이다 — **난이도 보정치는 그 스킬 위에 곱/합산되는 배율일
+뿐, 난이도 자체가 절대 수치를 고정하지 않는다.** 즉 같은 `HARD`라도 개인화된 상대 스킬에 따라
+체감 난이도가 달라질 수 있다.
 
-### 6.3 한글 입력 난이도
+### 6.3 난이도별 실행 파라미터
 
-공통 산성비 규칙은 단어 길이를 음절 수가 아니라 2벌식 기준 예상 타건 수(`keystrokes`)로 다룬다.
-AI의 입력 시간, 예상 데미지, 성공 가능성 계산도 같은 `keystrokes` 값을 사용한다.
-
-긴 단어는 더 많은 낙하 시간을 받지만, 이 추가 시간은 입력 부담을 완전히 상쇄하지 않는 방향으로
-후속 밸런싱에서 조정한다. AI는 긴 단어를 무조건 우선하지 않고 남은 낙하 시간, 예상 입력 시간, 데미지,
-다른 ACTIVE 단어를 놓치는 기회비용을 함께 평가해야 한다.
-
-```text
-typingMs = estimatedKeystrokes / keysPerSecond * 1000
-```
-
-### 6.4 AI 실력 단계별 운영값
-
-아래 값은 AI의 **기본 실력 프리셋**이며 플레이테스트 후 조정한다. 세 개의 별도 모델을 만드는 것이 아니라 하나의 목표 선택 알고리즘에 서로 다른 설정값을 주입한다.
+`typingWpm`/`accuracy`/`reactionDelayMs`(§6.2, 개인화 대상) 외에, 아래는 순수 난이도로만
+결정되는 고정 파라미터다(`DIFFICULTY_EXECUTION_CONFIG`, `ai-execution-profile.ts`):
 
 | 파라미터 | Beginner | Normal | Hard |
 |---|---:|---:|---:|
-| 인지 시간 | 650~1100ms | 400~800ms | 250~550ms |
-| 입력 속도 | 2.5~3.5음절/초 | 3.5~5.0음절/초 | 5.0~6.5음절/초 |
-| 오타 확률 | 18% | 10% | 5% |
-| 오타 후 포기 확률 | 45% | 25% | 10% |
-| 단어 자체 포기 확률 | 18% | 9% | 3% |
-| 후보 관찰 수 | 1개 | 2개 | 3개 |
-| 실제 동시 타이핑 | 1개 | 1개 | 1개 |
-| 반응 편차(jitter) | ±250ms | ±160ms | ±100ms |
-| 가상 왕복 지연 | 100~180ms | 80~150ms | 60~120ms |
+| 오타 수정 지연(`correctionDelayMs`) | 220ms | 150ms | 90ms |
+| 단어 포기 확률(`abandonProbability`) | 12% | 6% | 2% |
+| 반응 편차(`jitterMs`) | ±120ms | ±80ms | ±40ms |
+| 오타 확률 하한(`typoFloor`) | 2% | 1% | 0.5% |
+| 오타 확률 상한(`typoCeiling`) | 25% | 18% | 12% |
+
+오타 확률은 `1 - accuracy`를 위 하한/상한으로 clamp해서 구한다(개인화된 `typoProbability` 표본이
+있으면 그 값을 대신 clamp — §6.9). §6.2의 `abandonProbability`/`correctionDelayMs`도 개인화
+표본이 있으면 이 표에 우선해 대체된다.
+
+### 6.4 타이핑 실행 타임라인
+
+```text
+reactionEndsAtMs = selectedAtMs + max(1, reactionDelayMs + jitter)   // jitter = ±jitterMs 균등분포
+
+// 이후 키스트로크 1개씩:
+perKeystrokeMs = 60000 / (typingWpm * 5)
+각 키스트로크마다 typoChance 확률로 오타 발생 → 발생 시 correctionDelayMs 지연 추가
+```
+
+단어를 목표로 선택하는 시점에 `abandonProbability` 확률로 그 단어 자체를 포기한다
+(`AiExecutor.shouldAbandon`). 한글 입력은 2벌식 조합 상태를 실제로 시뮬레이션해
+(`hangul-ime.ts`) `opponent_typing`에 오타/수정 과정이 그대로 드러난다 — 완성형 텍스트를
+단순히 지연 후 통째로 제출하지 않는다.
 
 ### 6.5 게임 진행 단계와 AI 값의 관계
 
-게임 자체는 온라인 대전과 동일하게 시간 경과에 따라 단어 스폰 간격, 낙하 속도, 단어 티어가 상승한다. AI 실력 프리셋은 경기 시작 시 선택된 값을 끝까지 유지한다.
+게임 자체는 온라인 대전과 동일하게 시간 경과에 따라 단어 스폰 간격·낙하 속도·단어 티어가
+상승한다(`GAME_DESIGN.md` §3.3b/§3.4). AI 실행 프로필(§6.2/6.3)은 경기 시작 시 확정된 값을
+끝까지 유지한다 — 경기 중 사용자의 실력에 맞춰 AI 수치를 몰래 바꾸는 로직은 없다(§6.7).
 
-| 구분 | 시간에 따라 변경 | AI 단계에 따라 변경 |
-|---|---|---|
-| 단어 낙하 속도 | 예 | 아니오 |
-| 단어 생성 간격·수량 | 예 | 아니오 |
-| 출제 단어 티어 | 예 | 아니오 |
-| AI 인지 시간 | 아니오 | 예 |
-| AI 입력 속도 | 아니오 | 예 |
-| AI 오타·포기 확률 | 아니오 | 예 |
-| AI 후보 관찰 수 | 아니오 | 예 |
+운영값은 단어를 목표로 선택하는 시점(`AiExecutor.createTask`)에 확정된다. 같은 단어를 타이핑하는
+도중 게임 구간이 바뀌어도 이미 예약된 타임라인은 다시 계산하지 않는다.
 
-따라서 후반에는 모든 AI가 더 어려운 게임 상황을 맞지만, Beginner는 더 자주 놓치고 Hard는 더 높은 확률로 대응한다. 게임 진행에 맞춰 AI 능력치까지 추가 상승시키는 이중 보정은 MVP에서 사용하지 않는다.
-
-운영값은 단어가 스폰될 때 확정한다. 같은 단어를 처리하는 도중 게임 구간이 바뀌어도 예약된 행동값을 다시 계산하지 않는다.
-
-```ts
-const AI_PROFILES = {
-  BEGINNER: {
-    perceptionMs: [650, 1100],
-    syllablesPerSecond: [2.5, 3.5],
-    typoRate: 0.18,
-    giveUpAfterTypoRate: 0.45,
-    skipRate: 0.18,
-    candidateLimit: 1,
-    jitterMs: 250,
-  },
-  NORMAL: {
-    perceptionMs: [400, 800],
-    syllablesPerSecond: [3.5, 5.0],
-    typoRate: 0.10,
-    giveUpAfterTypoRate: 0.25,
-    skipRate: 0.09,
-    candidateLimit: 2,
-    jitterMs: 160,
-  },
-  HARD: {
-    perceptionMs: [250, 550],
-    syllablesPerSecond: [5.0, 6.5],
-    typoRate: 0.05,
-    giveUpAfterTypoRate: 0.10,
-    skipRate: 0.03,
-    candidateLimit: 3,
-    jitterMs: 100,
-  },
-} as const;
-```
-
-### 6.6 목표 선택
-
-활성 단어별 값을 0~1 범위로 정규화한다.
+### 6.6 목표 선택 (utility 기반, `state-evaluator.ts`)
 
 ```text
-priority = 0.45 × landingUrgency
-         + 0.30 × expectedDamage
-         + 0.25 × successProbability
-         + difficultyNoise
+successProbability = clamp(예상 완료 시각이 landAt 이전일 가능성, 0, 1)
+urgency             = clamp(1 - remainingMs / urgencyWindowMs, 0, 1)   // urgencyWindowMs = 3000ms
+baseExpectedValue   = successProbability × (damageWeight × damage + urgencyWeight × urgency)
+opportunityCost     = 이 단어를 고르면 놓치게 되는 다른 후보들의 기댓값
+utility             = baseExpectedValue − opportunityCostWeight × opportunityCost
+                       // damageWeight = urgencyWeight = 1, opportunityCostWeight = 0.25
 ```
 
-- `landingUrgency`: 바닥까지 남은 시간이 짧을수록 높음
-- `expectedDamage`: `5 + ceil(keystrokes / 2)` 기준 예상 데미지가 클수록 높음
-- `successProbability`: 남은 시간 안에 입력을 완료할 가능성. 긴 단어의 추가 낙하 시간은 입력 부담을
-  일부만 보정한다는 GAME_DESIGN.md의 원칙을 따른다.
-- `difficultyNoise`: Beginner는 크게, Hard는 작게 적용하는 선택 오차
-
-예상 입력 완료 시각이 바닥 도달 이후인 단어는 목표 후보에서 제외한다.
+완료 예상 시각이 `landAt`(바닥 도달 시각) 이후인 단어는 후보에서 제외(`eligible: false`)한다.
+현재 타이핑 중인 목표를 다른 단어로 바꾸려면 새 후보의 utility가 현재 목표보다
+`switchMargin`(0.1) 이상 높아야 한다 — 매 틱 사소한 차이로 목표가 자꾸 바뀌는(flip-flop)
+것을 막는 히스테리시스. 이 모든 후보/결정 과정은 `ai_monitor_snapshot`
+(`WEBSOCKET_PROTOCOL.md` §6.8)으로 그대로 노출되어 프론트에서 시각화할 수 있다.
 
 ### 6.7 적응 정책
 
-MVP에서는 경기 중 사용자의 실력에 맞춰 AI 수치를 몰래 변경하지 않는다.
+MVP 설계 원칙 그대로, **경기 중** 사용자의 실시간 실력에 맞춰 AI 수치를 몰래 바꾸는 로직(고무줄
+보정)은 없다 — 선택한 실행 프로필을 경기 끝까지 유지하고, 공통 게임 난이도 램프만 함께 적용된다.
+다만 이는 §6.9의 개인화와는 다른 층위다: 개인화는 **매치 시작 전에** 그 유저의 과거 매치 이력으로
+초기 스킬 프로필을 조정하는 것이지, 진행 중인 한 판 안에서 실시간으로 난이도를 바꾸는 것이
+아니다.
 
-- 선택한 난이도 프로필을 경기 끝까지 유지한다.
-- 공통 게임 난이도 램프만 적용한다.
-- 경기 종료 후 사용자 성적을 바탕으로 다음 연습 난이도를 추천할 수 있다.
-- 추천은 안내일 뿐 자동 변경하지 않는다.
+### 6.9 개인화 파이프라인 (실제 구현, 설계 당시 문서에 없던 내용)
+
+`backend#166`/`#176`에서 추가된, 실제 유저의 과거 데이터를 AI 실행 프로필에 반영하는 계층이다.
+
+| 구성요소 | 파일 | 역할 |
+|---|---|---|
+| `PerformanceService` | `performance.service.ts` | 매치 중 각 참가자의 타건/정답 기록(`WordAttemptRecord`)을 수집·집계 |
+| `TypeOrmPlayerPerformanceSource` | `player-performance-source.ts` | 특정 유저의 최근 매치 성능 표본(wpm/accuracy/reactionTimeMs) 조회 |
+| `TypeOrmPlayerBehaviorSource` | `player-behavior-source.ts` | 오타/포기/단어 길이별 성향 등 더 세부적인 행동 표본 조회 |
+| `PlayerPerformanceProfileProvider` | `ai/player-performance-profile-provider.ts` | 위 소스들을 조합해 `PlayerRuntimeProfile`을 만들고, `source`를 `DEFAULT`/`BLENDED`/`PERSONALIZED` 중 하나로 판정 |
+| population-default 추정기 | `population-default.estimator.ts`, `population-default.config.ts`, `generate-population-default.ts` | 개인 표본이 없는 신규 유저를 위한 전체 유저 통계 기반 기본값. **수동 오프라인 스크립트**로만 생성되며 자동 실행되지 않는다 — `requireExplicitConsent: true` + 환경변수 allowlist + 수동 publication gate로 3중 방어 |
+
+`source` 판정 기준(`player-performance-profile-provider.ts`):
+- `sampleCount === 0` → `DEFAULT`(population-default 또는 정적 기본값)
+- `0 < sampleCount < personalizedSampleThreshold` → `BLENDED`
+- `sampleCount >= personalizedSampleThreshold` → `PERSONALIZED`(그 유저의 실제 최근 매치 데이터를
+  직접 반영)
+
+`typoProbability`/`abandonProbability`는 표본 수가 쌓일수록 자동으로 `available`/`confidence`가
+올라가 실제로 활성화되지만, **`correctionDelayMs`와 단어 길이별 성향(`wordLengthPerformance`)은
+현재 `player-behavior-source.ts`에서 항상 `null`/`0`으로 하드코딩돼 있다** — 표본이 쌓여도
+저절로 채워지지 않고, 실제 관측 로직을 새로 구현해야 값이 생긴다(`backend#167`/`#168`).
+
+이 판정 결과는 `ai_monitor_snapshot.profile.source`(`WEBSOCKET_PROTOCOL.md` §6.8)로 그대로
+노출되어, 지금 이 AI가 기본값으로 도는지 개인화된 상대를 흉내 내는지 실시간으로 확인할 수 있다.
 
 ---
 
@@ -431,70 +447,65 @@ MVP에서는 경기 중 사용자의 실력에 맞춰 AI 수치를 몰래 변경
 | 구성요소 | 책임 |
 |---|---|
 | `AcidRainService` | 공통 스폰, HP, 종료, 단어 상태 전이, 판정 |
-| `AiPracticeService` | 연습 세션 생성, 난이도, 결과 정책 |
-| `AiOpponentService` | 목표 선택, 반응 시간, 오타·포기 판단 |
-| `AiScheduler` | 방별 예약 작업 생성·취소·일시정지·재개 |
-| `SeededRandom` | 재현 가능한 난수 제공 |
-| `AiMetrics` | 승률, 정확도, 반응 시간, 오류 수집 |
+| `AiPracticeService` | 연습 세션(로비) 생성, 난이도 선택, 활성 게임 잠금 |
+| `AiScheduler` | 방별 AI 실행 상태 관리 — 목표 재평가, 타이핑 태스크 예약/취소, 스냅샷 발행 |
+| `AiExecutor` | 실제 타이핑 타임라인 생성(§6.4) — 키스트로크별 오타/수정 시뮬레이션 |
+| `state-evaluator.ts`(모듈) | 목표 선택 utility 계산(§6.6) |
+| `PlayerPerformanceProfileProvider` | 개인화 프로필 로딩(§6.9) |
+| `PerformanceService` | 매치 중 타건/정답 기록 수집, 매치 종료 후 개인화 소스에 반영할 표본 저장 |
+
+`AiOpponentService`/`SeededRandom`/`AiMetrics`라는 이름의 별도 클래스는 없다 — 위 컴포넌트들로
+역할이 나뉘어 구현됐다.
 
 ### 7.1 핵심 판정 진입점
 
 ```ts
-AcidRainService.judge({
-  roomId,
-  playerId,
-  wordId,
-  text,
-  attemptId,
-});
+AcidRainService.submitWord(
+  { roomId, playerId, wordId, text, attemptId },
+  server, // Socket.IO Server — 결과를 즉시 룸에 브로드캐스트하기 위해 필요
+);
 ```
 
-- 같은 `attemptId` 재전송은 멱등 처리한다.
+- 같은 `attemptId` 재전송은 멱등 처리한다(`processedAttempts` 캐시, TTL 존재).
 - 새 `attemptId`는 같은 단어에 대한 새 입력 시도로 처리한다.
 - 단어 상태는 `ACTIVE → CLEARED` 또는 `ACTIVE → MISSED` 중 하나만 가능하다.
+- AI도 동일한 이 함수를 호출한다(`AiScheduler`의 `registerRoom({ submitWord: (input) =>
+  this.submitWord(input, server) })`) — 사람과 완전히 같은 판정 경로를 탄다.
 
-### 7.2 AI 세션 필드
+### 7.2 AI 스케줄러 상태(실제 필드)
 
 ```ts
-type AiDifficulty = 'BEGINNER' | 'NORMAL' | 'HARD';
-
-interface AiPracticeState {
-  enabled: true;
-  mode: 'AI_PRACTICE';
-  aiPlayerId: string;
+// ai-scheduler.ts SchedulerState (개념 요약, 실제는 registration 필드도 포함)
+interface SchedulerState {
+  roomId: string;
+  aiParticipantId: string;
+  modelPlayerId: string;      // 개인화 프로필을 조회할 실제 유저 ID
   difficulty: AiDifficulty;
-  seed: string;
-  currentTargetWordId: string | null;
-  schedulerVersion: number;
-  consecutiveErrors: number;
+  generation: number;         // 타이핑 태스크 세대 번호 — 무효화 기준(§7.3)
+  lastStateVersion: number;
+  paused: boolean;            // pause()/resume() 메서드는 존재하지만 현재 아무 곳에서도 호출되지 않음
+  destroyed: boolean;
+  profileSnapshot: PlayerSkillProfile;
+  runtimeProfile: PlayerRuntimeProfile;
 }
 ```
 
-### 7.3 일시정지 시계
+세션 자체의 `PAUSED` 상태(§3.1)와 `SchedulerState.paused`는 다른 개념이다 — 후자는 메서드로만
+존재하고 실제로 호출되는 지점이 없어(§3.1 참고) 사실상 미사용 상태다.
 
-```ts
-interface MatchClock {
-  startedAt: number;
-  matchEndAt: number;
-  pausedAt: number | null;
-  accumulatedPausedMs: number;
-  pauseCount: number;
-}
-```
+### 7.3 타이핑 태스크 무효화
 
-재개 시 일시정지 시간만큼 활성 단어의 마감 시각과 경기 종료 시각을 연장한다.
-
-### 7.4 예약 작업 무효화
-
-예약 콜백 실행 직전에 다음을 확인한다.
+예약된 키스트로크 타임아웃이 실행되기 직전, `AiExecutor`/`AiScheduler`가 다음을 확인한다.
 
 ```text
-room.status == IN_PROGRESS
-schedulerVersion == callbackVersion
-word.status == ACTIVE
+task.generation === state.generation   // 이 태스크가 여전히 최신 세대인지
+!state.destroyed
+word.status === 'ACTIVE'               // 사람이 먼저 지웠거나 이미 바닥에 닿지 않았는지
 ```
 
-`match_end`, `pause`, `resume`, 세션 정리 시 `schedulerVersion`을 증가시켜 오래된 콜백을 무효화한다.
+목표가 바뀌거나(§6.6 switchMargin 조건 충족) 세션이 끝나면 `state.generation`을 증가시켜 오래된
+콜백을 무효화한다. `AcidRainService.finalizeMatch()`에서 `this.aiScheduler.destroy(roomId)`를
+호출해 매치 종료 시 해당 방의 스케줄러 상태를 정리한다.
 
 ---
 
@@ -502,31 +513,30 @@ word.status == ACTIVE
 
 ### 8.1 로비 Client → Server
 
+> 아래는 실제 구현(`lobby.gateway.ts`)과 일치한다 — §0(로비 프로토콜)의 `{ type, payload, seq }`
+> envelope을 그대로 따른다.
+
 | Type | Payload | 설명 |
 |---|---|---|
 | `CREATE_AI_PRACTICE` | `{ requestId, difficulty }` | 비공개 AI 대전 세션 생성 |
 | `GET_ACTIVE_AI_PRACTICE` | `{}` | 재접속 또는 중복 요청 시 활성 세션 조회 |
+| `CANCEL_AI_PRACTICE` | `{ roomId? }` | **설계안에 없던 이벤트** — 진행 중인 AI 연습 세션을 취소 |
 
 ### 8.2 로비 Server → Client
 
 | Type | Payload | 설명 |
 |---|---|---|
-| `AI_PRACTICE_CREATED` | `{ roomId, matchId, mode, difficulty }` | 연습 세션 생성 완료 |
-| `AI_PRACTICE_REJECTED` | `{ code, message }` | 잘못된 난이도, 활성 게임 존재, 생성 실패 |
+| `AI_PRACTICE_CREATED` | `{ roomId, mode, difficulty, participants: ParticipantPublic[], expiresAt }` | 연습 세션 생성 완료(또는 `GET_ACTIVE_AI_PRACTICE` 응답). 설계안의 `matchId` 필드는 없다 — `roomId`가 곧 매치 식별자 역할을 겸한다 |
+| `AI_PRACTICE_REJECTED` | `{ code, message }` | 잘못된 난이도, 활성 게임 존재(`ACTIVE_AI_PRACTICE_EXISTS`), 세션 없음(`AI_PRACTICE_NOT_FOUND`) 등 |
 
 ### 8.3 게임 이벤트
 
-기존 `join_room`, `match_ready`, `match_start`, `word_spawn`, `word_submit`, `word_cleared`, `word_missed`, `state_sync`, `match_end`를 재사용한다.
-
-```ts
-type PlayerPublic = {
-  playerId: string;
-  userId?: string;
-  nickname: string;
-  playerType: 'HUMAN' | 'AI';
-  aiDifficulty?: 'BEGINNER' | 'NORMAL' | 'HARD';
-};
-```
+`/game` 네임스페이스는 PvP와 완전히 동일한 이벤트 계약을 그대로 재사용한다(`WEBSOCKET_PROTOCOL.md`
+§6.3) — AI 연습전만을 위한 별도 이벤트는 `opponent_typing`의 IME 확장과 `ai_monitor_snapshot`
+(§6.8) 두 가지뿐이며, 이 둘도 AI 참가자가 있을 때만 발생할 뿐 이벤트 이름 자체는 공용이다.
+`ParticipantPublic`의 실제 필드는 `{ participantId, userId?, nickname, type: 'HUMAN'|'AI',
+aiDifficulty?, avatar? }` — 설계안의 `PlayerPublic`/`playerId`/`playerType`이라는 이름은 실제로
+쓰인 적이 없다(`WEBSOCKET_PROTOCOL.md` §6.3 참고).
 
 AI는 가짜 사용자 계정을 요구하지 않으며, 친구·프로필·랭킹 대상에서 제외된다.
 
@@ -534,35 +544,25 @@ AI는 가짜 사용자 계정을 요구하지 않으며, 친구·프로필·랭�
 
 ## 9. 전적과 통계 정책
 
-### 9.1 저장 원칙
+### 9.1 저장 원칙 (실제 구현)
 
-AI 대전은 개인 기록으로 저장할 수 있지만 `User.wins`, `User.losses`, PvP 랭킹에는 반영하지 않는다.
+AI 대전은 개인 기록으로 저장되지만 `User.wins`/`User.losses`/PvP 랭킹에는 반영하지 않는다. 아래
+예시 JSON은 원래 설계안의 "권장 구조"였고, 실제 저장 스키마는 이 문서가 예상한 것과 이름이
+다르다 — 상세 컬럼은 `DATABASE_MODELING.md`/`DATABASE_DESIGN.md`를 정본으로 하고, 여기서는
+AI 관련 차이만 짚는다.
 
-권장 구조:
-
-```ts
-type MatchMode = 'PVP' | 'AI_PRACTICE';
-type MatchResult = 'HUMAN_WIN' | 'AI_WIN' | 'DRAW' | 'ABORTED' | 'VOID';
-```
-
-AI 참가자를 위해 실제 `User` 행을 생성하지 않는다.
-
-```json
-{
-  "matchId": "uuid",
-  "mode": "AI_PRACTICE",
-  "result": "HUMAN_WIN",
-  "difficulty": "NORMAL",
-  "finalHp": { "human": 37, "ai": 0 },
-  "clearedWords": { "human": 18, "ai": 12 },
-  "attempts": { "human": 22, "ai": 15 },
-  "incorrectAttempts": { "human": 2, "ai": 1 },
-  "missedWords": 4,
-  "avgReactionMs": { "human": 1240, "ai": 1510 },
-  "durationSec": 96,
-  "aiSeed": "match-seed"
-}
-```
+- `MatchHistory.mode`(`MatchMode` enum: `'PVP' | 'AI_PRACTICE'`)로 PvP와 구분한다 — 설계안의
+  예상과 값 자체는 일치한다.
+- 설계안의 `MatchResult`(`HUMAN_WIN`/`AI_WIN`/`DRAW`/`ABORTED`/`VOID`) 같은 단일 필드는 없다.
+  대신 `MatchHistory.winner`(nullable FK)로 승자를 표현하고, 참가자별 결과는
+  `MatchParticipant.rank`로, 개인 성능 기록의 데이터 품질은
+  `ParticipantPerformance.resultStatus`(`'FINISHED' | 'ABORTED' | 'VOID'`, §3.1)로 나눠서
+  표현한다.
+- AI 참가자를 위해 실제 `User` 행을 생성하지 않는다는 원칙은 그대로 유지된다
+  (`ParticipantPublic.type === 'AI'`는 `userId`가 없다).
+- 세부 수치(`clearedWords`/`attempts`/`avgReactionMs` 등)는 `WordAttemptRecord`/
+  `KeystrokeRecord`/`ParticipantPerformance` 테이블에 개별 레코드로 쌓인다 — 하나의 JSON blob이
+  아니라 정규화된 테이블 구조다.
 
 ### 9.2 정확도 정의
 
