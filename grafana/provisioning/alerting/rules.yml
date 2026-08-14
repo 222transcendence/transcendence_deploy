@@ -1,0 +1,172 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: transcendence-alerts
+    folder: Transcendence Alerts
+    interval: 1m
+    rules:
+      - uid: alert-api-error-rate
+        title: "API 에러율 5% 초과 (5분 지속)"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                sum(rate(http_request_duration_seconds_count{status_code=~"5.."}[5m]))
+                /
+                sum(rate(http_request_duration_seconds_count[5m]))
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0.05]
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "지난 5분간 API 5xx 에러율이 5%를 초과했습니다."
+
+      - uid: alert-api-latency-p95
+        title: "API 응답 시간 p95 2초 초과"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                histogram_quantile(0.95,
+                  sum(rate(http_request_duration_seconds_bucket[5m])) by (le)
+                )
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [2]
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API 응답 시간 p95가 2초를 초과했습니다."
+
+      - uid: alert-websocket-drop
+        title: "WebSocket 연결 수 50% 이상 급감"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                (
+                  (sum(websocket_connections offset 10m) - sum(websocket_connections))
+                  / sum(websocket_connections offset 10m)
+                )
+                and
+                (sum(websocket_connections offset 10m) > 0)
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0.5]
+        noDataState: OK
+        execErrState: Error
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "WebSocket 연결 수가 10분 전 대비 50% 이상 감소했습니다."
+
+      - uid: alert-memory-usage
+        title: "메모리 사용률 80% 초과"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [80]
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "호스트 메모리 사용률이 80%를 초과했습니다."
