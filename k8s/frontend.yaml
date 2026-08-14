@@ -23,7 +23,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: frontend
+  # Namespaced with a transcendence- prefix on purpose: this cluster's `public`
+  # namespace is shared with other personal projects (e.g. gs42stat), which
+  # already owned the generic names `backend`/`frontend` — reusing them here
+  # once silently hijacked those Services' selectors via `kubectl apply`.
+  name: transcendence-frontend
   namespace: public
 spec:
   selector: { app: transcendence, component: frontend }
