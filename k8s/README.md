@@ -22,11 +22,21 @@ contains personal infra details).
 | `pvc.yaml` | PersistentVolumeClaims for db/redis/grafana/uploads |
 | `db.yaml` | PostgreSQL Deployment + Service |
 | `redis.yaml` | Redis Deployment + Service |
-| `backend.yaml` | Backend Deployment + Service (image tag pinned to a release version) |
-| `frontend.yaml` | Frontend Deployment + Service (image tag pinned to a release version) |
+| `backend.yaml` | Backend Deployment + Service `transcendence-backend` (image tag pinned to a release version) |
+| `frontend.yaml` | Frontend Deployment + Service `transcendence-frontend` (image tag pinned to a release version) |
 | `ingress-app.yaml` | Ingress routing the app's public hostname to frontend/backend |
 | `monitoring.yaml` | Prometheus + Grafana Deployments + Services (optional, demo-only stack) |
 | `ingress-monitoring.yaml` | Ingress for Grafana/Prometheus public hostnames |
+
+## Naming
+
+The `public` namespace on this cluster is shared with other personal projects.
+`backend`/`frontend`/`db`/`redis` are generic names other projects may already own —
+if a Service with the same name already exists, `kubectl apply` silently overwrites its
+selector/ports, hijacking its traffic (this happened once to a co-tenant project's
+`backend`/`frontend` Services, causing a live outage until reverted). Every Service in
+this directory is namespaced with a `transcendence-` prefix for this reason; keep that
+convention for anything added here.
 
 ## Updating image tags for a new release
 
