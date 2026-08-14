@@ -426,7 +426,7 @@ Redis 세션 키: `game:acidroom:{roomId}`
   `state_sync` 복구가 가능하고, 재접속 시 `opponent_reconnected`가 브로드캐스트된다. 매치
   자체가 `MATCH_DURATION_MS`(180초) 하드 타임아웃을 가지고 있어 무한정 멈춰있을 수 없다.
   명시적으로 `leave_room`을 보내는 경우(스스로 나가겠다고 한 것)는 다르게 취급해 그 참가자만
-  즉시 탈락 처리한다(`eliminateParticipant`).
+  즉시 탈락 처리한다(`forfeitParticipant`).
 - 두 플레이어가 `join_room`을 거의 동시에 보내면 서버가 방별로 join 처리를 직렬화해 레이스를
   방지한다(`backend#144`). 클라이언트도 `match_ready`/`state_sync`를 받을 때까지 `join_room`을
   주기적으로 재전송하는 자가복구 로직을 둔다(`frontend`, `backend#144` 대응).
