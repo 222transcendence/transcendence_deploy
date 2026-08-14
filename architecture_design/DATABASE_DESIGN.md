@@ -14,29 +14,90 @@
 - `createdAt`: Timestamp
 - `updatedAt`: Timestamp
 
-단어 은행은 DB 테이블이 아니라 백엔드 코드의 정적 배열(`src/game/acid-rain/word-bank.ts`, 한국어 단어
-300~500개)로 관리한다 — 자주 바뀌지 않는 콘텐츠라 DB 엔티티로 분리할 필요가 없다.
+> **정정 (2026-08-14)**: 아래 "단어 은행은 정적 배열" 서술은 더 이상 사실이 아니다 — `word_dictionary`
+> 테이블(`WordDictionary` 엔티티, `backend#72`)로 DB화됐다. §"WordDictionary" 참고.
 
 ### MatchHistory
 - `id`: Primary Key (UUID) — User/Friend와 동일하게 uuid PK 일관성 유지
-- `hostUser` / `guestUser`: FK to User (`ON DELETE CASCADE`)
-- `winner`: FK to User, **nullable** — 무승부(TIME_LIMIT 동률) 규칙 반영 (`ON DELETE SET NULL`)
+- `hostUser` / `guestUser`: FK to User, **nullable** — 2인 매치 시절의 하위호환 컬럼. N인
+  매치는 아래 `participants` 관계로 참가자를 표현하므로 이 두 컬럼에 값이 없을 수 있다
+- `winner`: FK to User, **nullable** (`ON DELETE SET NULL`) — 단독 승자가 없으면(시간초과 동률,
+  또는 참가자 3명 이상의 공동 순위) `null`
+- `mode`: Enum (`PVP` / `AI_PRACTICE`) — AI 연습전은 이 값으로 구분되며 `User.wins`/`losses`
+  집계에서 제외된다
+- `participants`: `MatchParticipant`와 1:N 관계 — 실제 N인(2~4) 참가자별 순위/최종 HP는 여기서
+  조회한다 (`AI_OPPONENT_SPEC.md` §9 참고)
 - `roundsPlayed`: Integer — 매치당 처리된 단어 수
-- `matchData`: JSONB — `{ finalHp: { host, guest }, wordsTyped: { host, guest }, durationSec }`
+- `matchData`: JSONB — 참가자 키별 `finalHp`/`wordsTyped`/`durationSec` 등 요약 통계
 - `createdAt`: Timestamp
 - **인덱스**: `hostUser`, `guestUser` FK 컬럼(전적/매치 목록 조회, `GET /api/game/users/:id/matches`가
-  `hostUser = :id OR guestUser = :id`로 조회함). 리더보드(`GET /api/game/leaderboard`)는
-  `User.wins` 정렬이므로 `users.wins`에도 인덱스 권장.
+  `hostUser = :id OR guestUser = :id`로 조회함 — N인 매치 조회는 `participants` 관계를 통해
+  이뤄진다). 리더보드(`GET /api/game/leaderboard`)는 `User.wins` 정렬이므로 `users.wins`에도
+  인덱스 권장.
+
+### MatchParticipant (N인 매치 참가자별 결과, `backend#91`)
+- `id`: Primary Key (UUID)
+- `match`: FK to MatchHistory (`ON DELETE CASCADE`)
+- `user`: FK to User (`ON DELETE CASCADE`)
+- `finalHp`: Integer — 매치 종료 시점 HP(0이면 탈락)
+- `rank`: Integer — 순위(1=우승). 공동 순위는 동일 `rank` 허용
+
+### WordAttemptRecord (단어별 제출 시도 원장, `backend#160`)
+- `id`: Primary Key (UUID)
+- `matchId` / `participantId` / `userId?`(AI는 없음) / `wordId`
+- `attemptNo`: Integer — 같은 단어에 대한 몇 번째 시도인지
+- `result`: Enum (`CORRECT` / `WRONG` / `CORRECT_AFTER_CORRECTION` / `GIVE_UP` / `MISSED` /
+  `ALREADY_CLEARED`)
+- `wordSpawnedAt`/`firstTypingAt`/`lastTypingAt`/`submitReceivedAt`/`resolvedAt`: 반응시간·완료시간
+  분석용 타임스탬프
+- `submittedText`, `typoCount`, `correctionCount`, `totalKeystrokes`
+- **인덱스**: `(matchId, participantId)`, `(matchId, wordId)`
+
+### KeystrokeRecord (키스트로크 단위 원장, `backend#160`)
+- `id`: Primary Key (UUID)
+- `matchId` / `participantId` / `userId?` / `wordId` / `sequence`
+- `partialText`, `textLength`, `inputType`(`PROGRESS`/`BACKSPACE`/`CLEAR`), `clientTs?`
+- `serverReceivedAt`: 서버 수신 시각(권위 있는 타임라인 기준)
+- **인덱스**: `(matchId, participantId, wordId)`, `serverReceivedAt`
+
+### ParticipantPerformance (매치별 참가자 집계 성능, AI 개인화의 데이터 소스)
+- `id`: Primary Key (UUID)
+- `matchId` / `participantId` / `userId?` / `participantType`(`HUMAN`/`AI`) / `mode`(`PVP`/`AI_PRACTICE`)
+- `resultStatus`: Enum (`FINISHED` / `ABORTED` / `VOID`) — `ABORTED`/`VOID`는 population-default
+  통계 산출에서 제외된다(`AI_OPPONENT_SPEC.md` §6.9)
+- `correctWords`, `wrongAttempts`, `missedWords`, `typoCount`, `correctionCount`, `abandonedWords`,
+  `totalKeystrokes`, `sampleCount`
+- `typingWpm`, `accuracy`, `avgReactionTimeMs`, `medianReactionTimeMs`, `avgCompletionTimeMs`,
+  `typingDurationMs`: nullable float — `TypeOrmPlayerPerformanceSource`/`TypeOrmPlayerBehaviorSource`
+  (AI 개인화 파이프라인)가 이 테이블을 조회한다
+- **인덱스**: `matchId`, `userId`, `(participantType, resultStatus)`
+
+### WordDictionary (단어 은행, DB 테이블 — `backend#72`)
+- `id`: Primary Key (UUID)
+- `text`: String, **unique**
+- `language`: Enum (`ko`/`en`)
+- `contentType`: Enum (`word`/`phrase`/`sentence`)
+- `difficulty`: Enum (`easy`/`normal`/`hard`)
+- `category`: Enum (`common`/`tech`/`game`/`sentence`)
+- `length`: Integer — 음절 수
+- `keystrokes`: Integer — 2벌식 기준 예상 타건 수(`GAME_DESIGN.md` §3.2, 난이도 페이스 §3.4가
+  이 값을 기준으로 LOW/MID/HIGH 풀을 나눈다)
+- `source?`, `isActive`: Boolean
+- **인덱스**: `(language, difficulty, contentType, isActive)`
+- `WordDictionaryService.pickWord(elapsedSec)`가 실제 스폰 루프에서 호출하는 조회 경로다.
 
 ## 2. Real-time Session State (Stored in Redis)
 실시간 대전 중인 방의 상태는 고속 처리를 위해 Redis에 임시 보관함. 키: `game:acidroom:{roomId}`,
 TTL **1800초(30분)** (`WEBSOCKET_PROTOCOL.md` §6.3 참고).
 
+실제 세션 상태(`AcidRainSession`)는 N인(2~4) `participants[]` 배열 기반이다 — 아래는
+`state_sync` 이벤트와 동일한 모양(`WEBSOCKET_PROTOCOL.md` §6.3)의 3인전 예시:
+
 ```json
 {
-  "hp": { "host": 82, "guest": 91 },
+  "hp": { "user-uuid-A": 82, "user-uuid-B": 91, "user-uuid-C": 40 },
   "activeWords": [
-    { "wordId": "w_c410", "text": "타자", "tier": "easy", "fallDurationMs": 4600, "spawnedAt": "2026-07-19T10:01:10.000Z" }
+    { "wordId": "w_c410", "text": "타자", "keystrokes": 4, "lane": 4, "fallDurationMs": 4600, "spawnedAt": "2026-07-19T10:01:10.000Z", "landAt": "2026-07-19T10:01:14.600Z", "damage": 7 }
   ],
   "elapsedMs": 47000,
   "spawnIntervalMs": 1650
