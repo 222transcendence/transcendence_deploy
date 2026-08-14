@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: transcendence-frontend
+  namespace: public
+  labels: { app: transcendence, component: frontend }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: transcendence, component: frontend }
+  template:
+    metadata:
+      labels: { app: transcendence, component: frontend }
+    spec:
+      containers:
+        - name: frontend
+          # Bump this tag as part of the release commit — keep in sync with the
+          # git tag this k8s/ snapshot ships with (see k8s/README.md).
+          image: transcendence-frontend:v0.0.6
+          imagePullPolicy: IfNotPresent
+          ports: [{ containerPort: 80 }]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: public
+spec:
+  selector: { app: transcendence, component: frontend }
+  ports: [{ port: 80, targetPort: 80 }]
