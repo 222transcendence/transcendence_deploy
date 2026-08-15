@@ -11,7 +11,7 @@
 ## 1. Request/Response Envelope
 모든 응답은 일관된 형식을 유지함.
 
-\`\`\`json
+```json
 {
   "timestamp": "2026-05-12T10:00:00Z",
   "status": 200,
@@ -211,7 +211,7 @@ All endpoints below are prefixed with `/api/chat` and require **JWT Bearer Token
 - **Description**: 로그인한 사용자 본인의 전체 프로필 정보를 가져옴. (비밀번호 제외)
 - **Authentication**: JWT 필수
 - **Success Response (200 OK)**:
-    \`\`\`json
+    ```json
     {
       "timestamp": "2026-05-29T10:00:00Z",
       "status": 200,
@@ -228,13 +228,13 @@ All endpoints below are prefixed with `/api/chat` and require **JWT Bearer Token
       },
       "error": null
     }
-    \`\`\`
+    ```
 
 ### [GET] /api/users/{id}
 - **Description**: 특정 사용자 ID에 해당하는 타인의 프로필 정보를 가져옴. 민감한 정보(이메일, 비밀번호)는 제외하고 공개 가능한 데이터만 반환함.
 - **Authentication**: JWT 필수
 - **Success Response (200 OK)**:
-    \`\`\`json
+    ```json
     {
       "timestamp": "2026-05-29T10:00:00Z",
       "status": 200,
@@ -250,7 +250,7 @@ All endpoints below are prefixed with `/api/chat` and require **JWT Bearer Token
       },
       "error": null
     }
-    \`\`\`
+    ```
 - **Error Codes**:
     - \`404\`: 존재하지 않는 사용자 ID
 
@@ -258,14 +258,14 @@ All endpoints below are prefixed with `/api/chat` and require **JWT Bearer Token
 - **Description**: 로그인한 본인의 \`nickname\` 또는 \`avatar\`를 수정함. 닉네임 수정 시 중복 검사를 거침.
 - **Authentication**: JWT 필수
 - **Request Body**:
-    \`\`\`json
+    ```json
     {
       "nickname": "new_nickname",
       "avatar": "new_avatar.png"
     }
-    \`\`\`
+    ```
 - **Success Response (200 OK)**:
-    \`\`\`json
+    ```json
     {
       "timestamp": "2026-05-29T10:00:00Z",
       "status": 200,
@@ -282,7 +282,7 @@ All endpoints below are prefixed with `/api/chat` and require **JWT Bearer Token
       },
       "error": null
     }
-    \`\`\`
+    ```
 - **Error Codes**:
     - `400`: 유효성 검사 실패 (닉네임 길이 초과 등)
     - `409`: 닉네임 중복 발생 (`E_CONFLICT`)

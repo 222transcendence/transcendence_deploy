@@ -79,20 +79,15 @@ sequenceDiagram
 §0(로비, raw WebSocket)의 모든 메시지는 다음 구조를 따름. §5(채팅)·§6(게임)은 Socket.io named event +
 플랫 payload 방식이라 이 봉투를 쓰지 않음.
 
-\`\`\`json
+```json
 {
   "type": "ACTION_REJECTED, STATE_UPDATE, NOTIFICATION",
   "payload": { ... },
   "seq": 102  // 클라이언트 측 메시지 순서 보장용 시퀀스 번호
 }
-\`\`\`
+```
 
-## Reconnection Logic (실제 구현, `ADR.md` ADR-003/ADR-005 참고)
-
-> **정정 (2026-08-14)**: 아래는 실제로 구현된 적 없는 Redis Cluster `MOVED`/`ASK` 처리와
-> `game_checkpoints` 기반 체크포인트 복구를 서술하고 있었다 — Redis는 단일 인스턴스이고,
-> 게임 세션의 권위 있는 상태는 애초에 Redis가 아니라 백엔드 프로세스 메모리(`AcidRainService`의
-> `Map<roomId, AcidRainSession>`)에 있다. 실제 복구 모델은 다음과 같다.
+## Reconnection Logic (`ADR.md` ADR-003/ADR-005 참고)
 
 - **Heartbeat**: Socket.IO 기본 ping/pong 메커니즘을 그대로 사용한다.
 - **State Recovery**: 재접속 시 서버는 **인메모리 세션**(`AcidRainService.sessions`)의 현재
