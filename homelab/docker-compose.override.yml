@@ -38,4 +38,3 @@ services:
   nginx:
     volumes:
       - ./homelab/nginx-homelab.conf:/etc/nginx/nginx.conf:ro
-      - ./homelab/prometheus.htpasswd:/etc/nginx/.htpasswd:ro
