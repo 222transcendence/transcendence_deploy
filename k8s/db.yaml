@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: transcendence-db
+  namespace: public
+  labels: { app: transcendence, component: db }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: transcendence, component: db }
+  template:
+    metadata:
+      labels: { app: transcendence, component: db }
+    spec:
+      containers:
+        - name: db
+          image: postgres:15-alpine
+          ports: [{ containerPort: 5432 }]
+          envFrom:
+            - secretRef: { name: transcendence-env }
+          env:
+            - name: POSTGRES_USER
+              valueFrom: { secretKeyRef: { name: transcendence-env, key: DB_USER } }
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: transcendence-env, key: DB_PASSWORD } }
+            - name: POSTGRES_DB
+              valueFrom: { secretKeyRef: { name: transcendence-env, key: DB_NAME } }
+          volumeMounts:
+            - name: pgdata
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec: { command: ["pg_isready", "-U", "postgres"] }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: pgdata
+          persistentVolumeClaim: { claimName: transcendence-pgdata }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+  namespace: public
+spec:
+  selector: { app: transcendence, component: db }
+  ports: [{ port: 5432, targetPort: 5432 }]
