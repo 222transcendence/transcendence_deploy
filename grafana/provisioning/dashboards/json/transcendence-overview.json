@@ -235,6 +235,30 @@
           "refId": "A"
         }
       ]
+    },
+    {
+      "id": 16,
+      "type": "row",
+      "title": "Users",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 45 },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "Registered Users",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 46 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "min": 0 }, "overrides": [] },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "registered_users",
+          "legendFormat": "registered users",
+          "refId": "A"
+        }
+      ]
     }
   ]
 }
