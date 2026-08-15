@@ -7,10 +7,7 @@
 
 ### 0.1. Room Object
 
-> **갱신 (2026-08-11, `transcendence_deploy#92`)**: `host`/`guest` 2슬롯 고정 구조를 `players[]`
-> 배열(2~4명)로 확장한다.
-> 방을 만든 사람의 방 관리 권한(강퇴/방 폭파)은 `hostUserId`로 유지한다. 아래가 정본이며, 구현은
-> `transcendence_backend#95`(로비 룸 모델 확장)가 담당한다.
+방을 만든 사람의 방 관리 권한(강퇴/방 폭파)은 `hostUserId`로 유지한다.
 
 ```json
 {
