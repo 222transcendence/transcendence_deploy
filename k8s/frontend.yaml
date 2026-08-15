@@ -16,7 +16,7 @@ spec:
         - name: frontend
           # Bump this tag as part of the release commit — keep in sync with the
           # git tag this k8s/ snapshot ships with (see k8s/README.md).
-          image: transcendence-frontend:v0.0.8
+          image: transcendence-frontend:v0.0.10
           imagePullPolicy: IfNotPresent
           ports: [{ containerPort: 80 }]
 ---
