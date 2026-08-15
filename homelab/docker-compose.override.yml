@@ -4,24 +4,29 @@ services:
   # transcendence_net docker network, so pin their host bindings to
   # 127.0.0.1 (still reachable from the Z2 mini itself for debugging, not
   # from the internet even if the router's NAT/UPnP is misconfigured).
+  # `!override` is required: Compose concatenates `ports:` lists between base
+  # and override files by default rather than replacing them, so without it
+  # the root docker-compose.yml's 0.0.0.0 bindings stay published alongside
+  # these — defeating the whole point (confirmed live: db was reachable on
+  # 0.0.0.0:5432 even with this override applied, before !override was added).
   db:
-    ports:
+    ports: !override
       - "127.0.0.1:15432:5432"
   redis:
-    ports:
+    ports: !override
       - "127.0.0.1:16379:6379"
   backend:
-    ports:
+    ports: !override
       - "127.0.0.1:13000:3000"
   frontend:
-    ports:
+    ports: !override
       - "127.0.0.1:18080:80"
   node-exporter:
-    ports:
+    ports: !override
       - "127.0.0.1:19100:9100"
 
   prometheus:
-    ports:
+    ports: !override
       - "127.0.0.1:19090:9090"
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
@@ -29,7 +34,7 @@ services:
       - "--web.external-url=https://acidrain.hijae.dev/prometheus/"
 
   grafana:
-    ports:
+    ports: !override
       - "127.0.0.1:13001:3000"
     environment:
       GF_SERVER_ROOT_URL: https://acidrain.hijae.dev/grafana/
