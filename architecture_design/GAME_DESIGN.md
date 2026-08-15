@@ -99,9 +99,9 @@ WAITING → COUNTDOWN → IN_PROGRESS → FINISHED
 
 ### 3.3 스폰 간격 (난이도 램프)
 ```
-interval(ms) = max(700, 2000 - 50 * floor(elapsedSec / 10))
+interval(ms) = max(400, 1000 - 50 * floor(elapsedSec / 10))
 ```
-시작 2000ms에서 10초마다 50ms씩 빨라지며 700ms에서 바닥을 친다.
+시작 1000ms에서 10초마다 50ms씩 빨라지며 400ms에서 바닥을 친다(backend#192).
 
 ### 3.3b ACTIVE 단어 누적과 스폰 skip (`#76`, `#100`)
 - 방 하나의 최대 동시 `ACTIVE` 단어 수는 참가자 수에 비례한다 — 인당 5개(`WORDS_PER_PLAYER`),
