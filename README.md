@@ -51,19 +51,19 @@
 
 | Category | Module | Type | Points | Owner | Description |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Web** | Use a framework (FE/BE) | Major | 2 | hisong | React 및 NestJS 프레임워크 사용 |
-| **Web** | Real-time features | Major | 2 | hisong | WebSockets 기반 실시간 동기화 |
-| **Web** | User Interaction | Major | 2 | jahong | 채팅, 프로필, 친구 시스템 구현 |
-| **Web** | Use an ORM | Minor | 1 | jishin | TypeORM을 통한 효율적인 데이터 관리 |
-| **User Management** | Standard user management | Major | 2 | jishin | 프로필 수정, 아바타 업로드(기본 아바타 포함), 친구+온라인 상태 |
-| **User Management** | Game statistics & match history | Minor | 1 | yuhyoon | 전적/승률/매치 히스토리, 리더보드 |
-| **User Management** | Remote authentication (OAuth 2.0) | Minor | 1 | jishin | 42 intra OAuth 2.0 로그인 |
-| **AI** | AI Opponent | Major | 2 | kyouhele | `architecture_design/AI_OPPONENT_SPEC.md` 기준 인간형 AI 대전, 유저 성능 기반 개인화 |
-| **Gaming** | Web-based game | Major | 2 | yuhyoon | 실시간 웹 기반 산성비 타자 대전 |
-| **Gaming** | Remote players | Major | 2 | yuhyoon | 원격 사용자 간의 온라인 대전 |
-| **Gaming** | Multiplayer (3+ players) | Major | 2 | yuhyoon | 2~4인 배틀로얄 판정 엔진 |
-| **Gaming** | Spectator mode | Minor | 1 | yuhyoon | 진행 중인 매치 실시간 관전 |
-| **DevOps** | Monitoring System | Major | 2 | hisong | Prometheus & Grafana 대시보드 |
+| **Web** | Use a framework (FE/BE) | Major | 2 | hisong, jahong | React 및 NestJS 프레임워크 사용 |
+| **Web** | Real-time features | Major | 2 | hisong, yuhyoon | WebSockets 기반 실시간 동기화 |
+| **Web** | User Interaction | Major | 2 | jishin, jahong | 채팅, 프로필, 친구 시스템 구현 |
+| **Web** | Use an ORM | Minor | 1 | jishin, hisong | TypeORM을 통한 효율적인 데이터 관리 |
+| **User Management** | Standard user management | Major | 2 | jishin, jahong | 프로필 수정, 아바타 업로드(기본 아바타 포함), 친구+온라인 상태 |
+| **User Management** | Game statistics & match history | Minor | 1 | yuhyoon, jishin | 전적/승률/매치 히스토리, 리더보드 |
+| **User Management** | Remote authentication (OAuth 2.0) | Minor | 1 | jishin, hisong | 42 intra OAuth 2.0 로그인 |
+| **AI** | AI Opponent | Major | 2 | kyouhele, yuhyoon | `architecture_design/AI_OPPONENT_SPEC.md` 기준 인간형 AI 대전, 유저 성능 기반 개인화 |
+| **Gaming** | Web-based game | Major | 2 | yuhyoon, hisong | 실시간 웹 기반 산성비 타자 대전 |
+| **Gaming** | Remote players | Major | 2 | yuhyoon, hisong | 원격 사용자 간의 온라인 대전 |
+| **Gaming** | Multiplayer (3+ players) | Major | 2 | yuhyoon, kyouhele | 2~4인 배틀로얄 판정 엔진 |
+| **Gaming** | Spectator mode | Minor | 1 | yuhyoon, jahong | 진행 중인 매치 실시간 관전 |
+| **DevOps** | Monitoring System | Major | 2 | hisong, kyouhele | Prometheus & Grafana 대시보드 |
 | **Total** | | | **22** | | |
 
 ### 점수 집계 방식
