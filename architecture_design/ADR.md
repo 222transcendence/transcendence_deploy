@@ -75,7 +75,7 @@
   정교한 체크포인팅 시스템을 제안했었다(Celery/RabbitMQ/Sidekiq 워커, 5초 주기, `seq` 기반
   idempotent 복구 등).
 * **Decision (실제)**: 이 체크포인팅 시스템은 구현되지 않았다 — `game_checkpoints` 테이블도,
-  워커 큐도 코드에 없다. 대신 훨씬 단순한 정책을 채택했다(`backend#161`): **연결이 끊겨도
+  워커 큐도 코드에 없다. 대신 훨씬 단순한 정책을 채택했다: **연결이 끊겨도
   매치를 일시정지하지 않고 그대로 진행시키며, 강제 탈락 유예 타이머를 두지 않는다.** 끊긴
   참가자는 스스로 공격은 못 하지만 스플래시 데미지는 계속 받을 수 있어 자연스러운 페널티가
   있고, 매치 자체가 180초 하드 타임아웃을 가지므로 무한정 멈춰있지 않는다. 재접속은 아무 때나
@@ -97,7 +97,7 @@
   설계를 배제하고 `AcidRainService`/`AcidRainGateway`를 판정 엔진의 중심으로 삼았다.
 * **Consequences**:
     - `GAME_DESIGN.md`가 산성비 규칙의 정본이며, `WEBSOCKET_PROTOCOL.md`,
-      `AI_OPPONENT_SPEC.md`, `DATABASE_DESIGN.md`, `API_SPECIFICATION.md`가 이를 뒷받침한다.
+      `AI_OPPONENT_SPEC.md`, `DATABASE_MODELING.md`, `API_SPECIFICATION.md`가 이를 뒷받침한다.
 
 ## ADR-007: Prometheus + Grafana 모니터링 스택 도입
 * **Status**: Accepted
@@ -107,7 +107,7 @@
   기반 자동 구성)를 각 단일 컨테이너로 추가했다. 백엔드는 커스텀 메트릭(활성 게임 수, 단어
   판정 카운터, HTTP 요청 인터셉터 등)을 노출한다.
 * **Consequences**:
-    - **장점**: 배포 환경에서 실시간 지표를 즉시 확인 가능(`deploy#4` EPIC).
+    - **장점**: 배포 환경에서 실시간 지표를 즉시 확인 가능.
     - **트레이드오프**: Grafana 관리자 비밀번호는 `.env`의 `GRAFANA_ADMIN_PASSWORD`로
       설정하며 기본값(`change_me_in_production`)을 반드시 교체해야 한다 — `.env`는
       gitignore 처리돼 저장소에 커밋되지 않는다.
