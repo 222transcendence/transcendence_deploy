@@ -32,17 +32,36 @@
 | **Developer** | jahong | 프론트엔드 화면 초기 설계·구현(게임 보드·로비·대기실·프로필·전적/리더보드), 게임 소켓 컨텍스트 및 애니메이션 컴포넌트 |
 | **Developer** | jishin | 소셜 기능 백엔드 전담(친구 요청·수락·거절·온라인 상태, 채팅 API/Gateway); DB ORM 엔티티·마이그레이션 설계 |
 
+### 개별 기여 내역 (Individual Contributions)
+> Git 커밋 이력(작성자 이메일 기준)을 근거로 작성했습니다. 세부 항목은 각 팀원 확인 후 갱신 예정입니다.
+
+| 로그인 | 주요 기여 |
+| :--- | :--- |
+| **yuhyoon** (PO) | 기능 우선순위 관리(GitHub Projects Phase 단위 이슈 관리), 최종 모듈 검증(`CHECKLIST.md`); 백엔드 Acid Rain 게임 핵심 로직(`src/game`) 구현, 매치 결과 저장/전적 히스토리(`recordMatchHistory`), 유저 프로필 관련 프론트 페이지 |
+| **hisong** (Tech Lead) | 시스템 아키텍처 설계, 실시간 웹소켓 로직 설계; 백엔드 게임/로비/인증 모듈(`src/game`, `src/lobby`, `src/auth`), 프론트 페이지/타입/훅 기반 구조 |
+| **jishin** (Developer) | 백엔드 API 및 DB ORM 스키마 설계; 게임/채팅/로비/단어사전/친구 모듈(`src/game`, `src/chat`, `src/word-dictionary`, `src/friend`), 프론트 다수 페이지 |
+| **jahong** (Developer) | 프론트엔드 UI/UX(`src/pages`, `src/components` 다수); 백엔드 유저 모듈(`src/user`) 일부 |
+| **kyouhele** (PM) | 스케줄 관리, 데브옵스 모니터링 시스템 구축(Prometheus/Grafana); 백엔드 게임/친구/마이그레이션/메트릭 모듈 기여 |
+
+### 프로젝트 관리 방식
+- **GitHub Projects 보드**로 전체 작업을 Phase 1~8(인프라 → 핵심 기능 → 고급 모듈 → 하드닝/평가 준비)로 나누고, 각 작업을 고유 ID(`P1-01` 등)를 가진 이슈로 관리했습니다. 이슈 상태는 Backlog → Ready → In Progress → In Review → Done으로 흐릅니다.
+- PO(yuhyoon)가 기능 우선순위를 정해 Phase/이슈를 배치하고, PM(kyouhele)이 일정과 진행 상황을 관리했습니다.
+- 커밋 메시지에 이슈/체크리스트 ID를 남기는 컨벤션(`feat(scope): 요약 [P2-01]`)으로 구현-검증-커밋 증빙을 1:1 대응시켰으며, 그 결과물이 `CHECKLIST.md`입니다.
+- 브랜치 전략과 커밋 컨벤션 상세는 §9 참고.
+
 ---
 
 ## 3. Technical Stack
-- **Frontend Framework**: React (TypeScript)
-- **Backend Framework**: NestJS (Node.js)
-- **Real-time**: Socket.io (WebSockets)
-- **Database / ORM**: PostgreSQL / TypeORM
-- **Cache / Session State**: Redis
-- **Reverse Proxy / HTTPS**: Nginx with self-signed TLS certificate for local evaluation
-- **Monitoring**: Prometheus, node-exporter, Grafana dashboard target
-- **Infrastructure**: Docker, Docker Compose
+| Stack | Choice | 선택 이유 |
+| :--- | :--- | :--- |
+| Frontend Framework | React (TypeScript) | 컴포넌트 기반 재사용성과 타입 안전성, 팀 내 사전 경험 |
+| Backend Framework | NestJS (Node.js) | 모듈/DI 구조가 명확해 인증·게임·채팅 등 도메인별 모듈 분리에 적합, TypeScript 일관성 유지 |
+| Real-time | Socket.io (WebSockets) | 룸(room) 기반 브로드캐스트와 재연결 처리를 기본 제공해 게임/채팅/로비 네임스페이스 분리에 적합 |
+| Database / ORM | PostgreSQL / TypeORM | 관계형 데이터(매치 기록, 참가자, 친구 관계 등) 무결성 보장, NestJS와의 통합 용이성 |
+| Cache / Session State | Redis | 게임 세션/실시간 상태처럼 휘발성이 큰 데이터를 빠르게 읽고 쓰기 위함 |
+| Reverse Proxy / HTTPS | Nginx + self-signed TLS | 단일 HTTPS 진입점으로 프론트/백엔드 트래픽을 통합하고 평가 환경에서 인증서 발급 없이 HTTPS 요구사항 충족 |
+| Monitoring | Prometheus, node-exporter, Grafana | DevOps Monitoring 모듈 요구사항 충족 및 컨테이너/서비스 상태 가시화 |
+| Infrastructure | Docker, Docker Compose | 단일 명령어(`docker-compose up --build`)로 전체 스택 배포 요구사항 충족 |
 
 ---
 

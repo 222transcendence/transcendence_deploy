@@ -32,12 +32,12 @@
 
 | ID | Task | Owner | Status | Implementation Evidence | Validation Evidence | Commit(s) |
 |---|---|---|---|---|---|---|
-| P2-01 | Authentication: signup/login/profile update E2E |  | TODO |  |  |  |
+| P2-01 | Authentication: signup/login/profile update E2E | jishin | Done | auth/auth.controller.ts, auth.service.ts, strategies/ft.strategy.ts | auth.service.spec.ts, ft.strategy.spec.ts, ft-auth.guard.spec.ts + OAuth 흐름 리허설(2026-08-15) | feat(auth): implement 42 OAuth 2.0 login with FtStrategy [#10] |
 | P2-02 | Password hashing and salting verification in DB | hijae | Done | auth.service.ts | test_auth.sh E2E signup test | feat(auth): implement signup api with password hashing [#7] [P2-02] |
 | P2-03 | Basic Acid Rain typing battle gameplay loop complete | yuhyoon | Done | GAME_DESIGN.md, WEBSOCKET_PROTOCOL.md | 산성비 게임 흐름 문서 검토 | backend#72, backend#75, deploy#65 |
-| P2-04 | WebSocket real-time sync for game state |  | TODO |  |  |  |
-| P2-05 | Chat messaging latency target (<1s) validated |  | TODO |  |  |  |
-| P2-06 | Friend system flow: add/accept/status update |  | TODO |  |  |  |
+| P2-04 | WebSocket real-time sync for game state | jishin | Done | game/acid-rain/acid-rain.gateway.ts | acid-rain.gateway.spec.ts | feat(game): AcidRainGateway — join/leave/word_submit 핸들러 구현 [#74] |
+| P2-05 | Chat messaging latency target (<1s) validated | jishin | Done | chat/chat.gateway.ts, chat.service.ts | chat.gateway.spec.ts, chat.service.spec.ts + 5인 동시 접속(관전 1명 포함) 상황에서 체감상 즉시 도착 직접 확인(2026-08-15, yuhyoon) | feat(chat): implement chat system with Socket.io and DB persistence [#28] |
+| P2-06 | Friend system flow: add/accept/status update | kyouhele | Done | friend/friend.service.ts, friend.controller.ts, entities/friend.entity.ts | friend.service.spec.ts | feat(#13): implement friend API module service and controller |
 
 ---
 
@@ -45,12 +45,12 @@
 
 | ID | Task | Owner | Status | Implementation Evidence | Validation Evidence | Commit(s) |
 |---|---|---|---|---|---|---|
-| P3-01 | Remote players match flow stable under reconnect |  | TODO |  |  |  |
-| P3-02 | AI opponent card strategy logic complete |  | TODO |  |  |  |
+| P3-01 | Remote players match flow stable under reconnect | hisong | Done | game/acid-rain/acid-rain.service.ts (handleDisconnect/handleReconnect) | acid-rain.service.spec.ts, acid-rain.gateway.spec.ts + 재접속 로직 리허설(2026-08-15) | fix(game): 연결 끊김 시 30초 후 강제 탈락/승리 처리하던 로직 제거 (#161) |
+| P3-02 | AI opponent card strategy logic complete | kyouhele | Done | game/acid-rain/ai/ai-executor.ts, ai-scheduler.ts, state-evaluator.ts | ai-executor.spec.ts, ai-scheduler.spec.ts, ai-balance.smoke.spec.ts | feat(ai): add human-like executor and scheduler |
 | P3-03 | Match result persistence and score history integrity | yuhyoon | Done | game.service.ts (recordMatchHistory) | game-engine.spec.ts game-over tests | feat(game): implement game over logic, match persistence, and redis teardown [P3-03] |
-| P3-04 | Prometheus metrics exposed and scraped |  | TODO |  |  |  |
-| P3-05 | Grafana dashboard with CPU/memory/network panels |  | TODO |  |  |  |
-| P3-06 | Monitoring alert rule smoke test complete |  | TODO |  |  |  |
+| P3-04 | Prometheus metrics exposed and scraped | hisong | Done | prometheus/prometheus.yml, metrics/metrics.registry.ts, metrics.controller.ts | docker-compose prometheus 서비스가 backend:3000/metrics, node-exporter:9100 스크레이핑 확인 | feat(metrics): add prom-client registry, http duration interceptor, /metrics endpoint [#12] [P7-01] |
+| P3-05 | Grafana dashboard with CPU/memory/network panels | hisong | Done | grafana/provisioning/dashboards/json/transcendence-overview.json | 호스팅된 Grafana 대시보드 직접 접속 확인(2026-08-15) | feat(monitoring): Grafana 대시보드 추가 [#13] |
+| P3-06 | Monitoring alert rule smoke test complete | hisong | Done | grafana/provisioning/alerting/rules.yml, contactpoints.yml, policies.yml | Grafana Alerting > Alert rules에서 4개 규칙(API 에러율/응답시간/WebSocket 급감/메모리) 전부 Normal 상태로 정상 평가 중 직접 확인(2026-08-15, yuhyoon) | feat(grafana): Grafana 알림 규칙 4종 + 웹훅 채널 provisioning (#14) |
 
 ---
 
@@ -58,12 +58,12 @@
 
 | ID | Task | Owner | Status | Implementation Evidence | Validation Evidence | Commit(s) |
 |---|---|---|---|---|---|---|
-| P4-01 | Browser console warning/error zero baseline |  | TODO |  |  |  |
-| P4-02 | Privacy Policy and Terms of Service page reachable |  | TODO |  |  |  |
-| P4-03 | Multi-user concurrency check (>5 users) completed |  | TODO |  |  |  |
-| P4-04 | README module-to-owner and demo flow finalized |  | TODO |  |  |  |
-| P4-05 | AI_USAGE transparency and review log finalized |  | TODO |  |  |  |
-| P4-06 | Final demo script and fallback scenario rehearsed |  | TODO |  |  |  |
+| P4-01 | Browser console warning/error zero baseline | yuhyoon | Done | (프론트 전체) | 호스팅된 사이트에서 Chrome DevTools 콘솔 직접 확인(2026-08-15, yuhyoon) |  |
+| P4-02 | Privacy Policy and Terms of Service page reachable | jishin | Done | frontend/src/pages/PrivacyPolicyPage.tsx, TermsOfServicePage.tsx, components/Footer.tsx | 호스팅된 사이트에서 Footer 링크로 두 페이지 직접 접속 확인(2026-08-15, yuhyoon) | feat(legal): add PrivacyPolicy and TermsOfService pages with Footer component [#11] |
+| P4-03 | Multi-user concurrency check (>5 users) completed | yuhyoon | Done | game/acid-rain/acid-rain.service.ts (AcidRainSession.participants[], 2~4인 배틀로얄 + 다중 방 동시 운영) | 5인 이상 동시 접속 정상 동작 직접 확인(2026-08-15, yuhyoon) |  |
+| P4-04 | README module-to-owner and demo flow finalized | yuhyoon | Done | README.md (팀원 개별 기여, 기술스택 선택 이유, 모듈 선택 이유/담당자, 프로젝트 관리 방식 섹션 보강, 2026-08-15) | PDF 평가표 8개 필수 섹션 대조 완료 | docs: 평가 체크리스트 최종 점검 및 README 필수 섹션 보강 [P4-04] (a09e191) |
+| P4-05 | AI_USAGE transparency and review log finalized | yuhyoon | Done | AI_USAGE.md (정책/도구/영역별 사용 로그/산출물/리뷰 체크리스트/결론 전부 기재) | 내용 완전성 직접 검토 완료(2026-08-15) | docs: update README.md and AI_USAGE.md with final module list |
+| P4-06 | Final demo script and fallback scenario rehearsed | yuhyoon | Done | (문서 없음) | 평가표(PDF) 기준 구두 리허설 완료(2026-08-15) — PO 개인 기여/역할 설명, 모듈 13개 중 12개 시연 포인트, Git 히스토리 라이브 데모 명령어, 콘솔/Privacy·ToS/5인 동시접속/알림 스모크 테스트 확인 |  |
 
 ---
 
@@ -72,19 +72,19 @@
 | Phase | Done | In Progress | Blocked | TODO |
 |---|---:|---:|---:|---:|
 | Phase 1 | 6 | 0 | 0 | 0 |
-| Phase 2 | 2 | 0 | 0 | 4 |
-| Phase 3 | 1 | 0 | 0 | 5 |
-| Phase 4 | 0 | 0 | 0 | 6 |
+| Phase 2 | 6 | 0 | 0 | 0 |
+| Phase 3 | 6 | 0 | 0 | 0 |
+| Phase 4 | 6 | 0 | 0 | 0 |
 
 ## PM Weekly Review Log
 
 | Date | Reviewer | Phase Reviewed | Missing IDs | Missing Commit Evidence | Top Risk | Next 3 Commits |
 |---|---|---|---|---|---|---|
-|  |  |  |  |  |  |  |
+| 2026-08-15 | yuhyoon (PO) | Phase 2-4 전체 | P4-03, P4-05 | P4-04(README 갱신 미커밋) | P4-03(5인 이상 동시접속 테스트 미실시), P2-05/P3-06(검증 증빙 부족) | 1) README 갱신 커밋 [P4-04] 2) AI_USAGE.md 최신화 확인 [P4-05] 3) 5인 동시접속 테스트 실행 [P4-03] |
 
 ## Final Completion Gate
-- [ ] 모든 체크리스트 ID가 Done 상태
-- [ ] 모든 Done 항목에 Commit(s) 존재
-- [ ] README, AI_USAGE 최신화
-- [ ] 데모 리허설 완료
-- [ ] 평가 기준(Function-First) 충족
+- [x] 모든 체크리스트 ID가 Done 상태 (24/24, 2026-08-15)
+- [ ] 모든 Done 항목에 Commit(s) 존재 — P4-01/P4-03/P4-06은 코드 변경이 아닌 라이브 검증 항목이라 연결된 커밋 없음(의도된 예외)
+- [x] README, AI_USAGE 최신화 (2026-08-15)
+- [x] 데모 리허설 완료 (2026-08-15)
+- [ ] 평가 기준(Function-First) 충족 — 팀 전체 최종 확인 필요
