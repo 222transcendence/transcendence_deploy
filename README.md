@@ -32,39 +32,65 @@
 | **Developer** | jahong | 프론트엔드 UI/UX |
 | **Developer** | jishin | 백엔드 API 및 DB ORM 스키마 설계 |
 
+### 개별 기여 내역 (Individual Contributions)
+> Git 커밋 이력(작성자 이메일 기준)을 근거로 작성했습니다. 세부 항목은 각 팀원 확인 후 갱신 예정입니다.
+
+| 로그인 | 주요 기여 |
+| :--- | :--- |
+| **yuhyoon** (PO) | 기능 우선순위 관리(GitHub Projects Phase 단위 이슈 관리), 최종 모듈 검증(`CHECKLIST.md`); 백엔드 Acid Rain 게임 핵심 로직(`src/game`) 구현, 매치 결과 저장/전적 히스토리(`recordMatchHistory`), 유저 프로필 관련 프론트 페이지 |
+| **hisong** (Tech Lead) | 시스템 아키텍처 설계, 실시간 웹소켓 로직 설계; 백엔드 게임/로비/인증 모듈(`src/game`, `src/lobby`, `src/auth`), 프론트 페이지/타입/훅 기반 구조 |
+| **jishin** (Developer) | 백엔드 API 및 DB ORM 스키마 설계; 게임/채팅/로비/단어사전/친구 모듈(`src/game`, `src/chat`, `src/word-dictionary`, `src/friend`), 프론트 다수 페이지 |
+| **jahong** (Developer) | 프론트엔드 UI/UX(`src/pages`, `src/components` 다수); 백엔드 유저 모듈(`src/user`) 일부 |
+| **kyouhele** (PM) | 스케줄 관리, 데브옵스 모니터링 시스템 구축(Prometheus/Grafana); 백엔드 게임/친구/마이그레이션/메트릭 모듈 기여 |
+
+### 프로젝트 관리 방식
+- **GitHub Projects 보드**로 전체 작업을 Phase 1~8(인프라 → 핵심 기능 → 고급 모듈 → 하드닝/평가 준비)로 나누고, 각 작업을 고유 ID(`P1-01` 등)를 가진 이슈로 관리했습니다. 이슈 상태는 Backlog → Ready → In Progress → In Review → Done으로 흐릅니다.
+- PO(yuhyoon)가 기능 우선순위를 정해 Phase/이슈를 배치하고, PM(kyouhele)이 일정과 진행 상황을 관리했습니다.
+- 커밋 메시지에 이슈/체크리스트 ID를 남기는 컨벤션(`feat(scope): 요약 [P2-01]`)으로 구현-검증-커밋 증빙을 1:1 대응시켰으며, 그 결과물이 `CHECKLIST.md`입니다.
+- 브랜치 전략과 커밋 컨벤션 상세는 §9 참고.
+
 ---
 
 ## 3. Technical Stack
-- **Frontend Framework**: React (TypeScript)
-- **Backend Framework**: NestJS (Node.js)
-- **Real-time**: Socket.io (WebSockets)
-- **Database / ORM**: PostgreSQL / TypeORM
-- **Cache / Session State**: Redis
-- **Reverse Proxy / HTTPS**: Nginx with self-signed TLS certificate for local evaluation
-- **Monitoring**: Prometheus, node-exporter, Grafana dashboard target
-- **Infrastructure**: Docker, Docker Compose
+| Stack | Choice | 선택 이유 |
+| :--- | :--- | :--- |
+| Frontend Framework | React (TypeScript) | 컴포넌트 기반 재사용성과 타입 안전성, 팀 내 사전 경험 |
+| Backend Framework | NestJS (Node.js) | 모듈/DI 구조가 명확해 인증·게임·채팅 등 도메인별 모듈 분리에 적합, TypeScript 일관성 유지 |
+| Real-time | Socket.io (WebSockets) | 룸(room) 기반 브로드캐스트와 재연결 처리를 기본 제공해 게임/채팅/로비 네임스페이스 분리에 적합 |
+| Database / ORM | PostgreSQL / TypeORM | 관계형 데이터(매치 기록, 참가자, 친구 관계 등) 무결성 보장, NestJS와의 통합 용이성 |
+| Cache / Session State | Redis | 게임 세션/실시간 상태처럼 휘발성이 큰 데이터를 빠르게 읽고 쓰기 위함 |
+| Reverse Proxy / HTTPS | Nginx + self-signed TLS | 단일 HTTPS 진입점으로 프론트/백엔드 트래픽을 통합하고 평가 환경에서 인증서 발급 없이 HTTPS 요구사항 충족 |
+| Monitoring | Prometheus, node-exporter, Grafana | DevOps Monitoring 모듈 요구사항 충족 및 컨테이너/서비스 상태 가시화 |
+| Infrastructure | Docker, Docker Compose | 단일 명령어(`docker-compose up --build`)로 전체 스택 배포 요구사항 충족 |
 
 ---
 
 ## 4. Modules & Point Calculation (Total: 22 Points)
 선택한 모듈 리스트 및 점수 계산입니다. (통과 기준: 14점, 보너스 상한 +5 — 아래 "점수 집계 방식" 참고) 각 모듈의 최종 검증 상태는 `CHECKLIST.md`와 평가 전 스모크 테스트 결과를 기준으로 확인합니다.
 
-| Category | Module | Type | Points | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| **Web** | Use a framework (FE/BE) | Major | 2 | React 및 NestJS 프레임워크 사용 |
-| **Web** | Real-time features | Major | 2 | WebSockets 기반 실시간 동기화 |
-| **Web** | User Interaction | Major | 2 | 채팅, 프로필, 친구 시스템 구현 |
-| **Web** | Use an ORM | Minor | 1 | TypeORM을 통한 효율적인 데이터 관리 |
-| **User Management** | Standard user management | Major | 2 | 프로필 수정, 아바타 업로드(기본 아바타 포함), 친구+온라인 상태 |
-| **User Management** | Game statistics & match history | Minor | 1 | 전적/승률/매치 히스토리, 리더보드 |
-| **User Management** | Remote authentication (OAuth 2.0) | Minor | 1 | 42 intra OAuth 2.0 로그인 |
-| **AI** | AI Opponent | Major | 2 | `architecture_design/AI_OPPONENT_SPEC.md` 기준 인간형 AI 대전, 유저 성능 기반 개인화 |
-| **Gaming** | Web-based game | Major | 2 | 실시간 웹 기반 산성비 타자 대전 |
-| **Gaming** | Remote players | Major | 2 | 원격 사용자 간의 온라인 대전 |
-| **Gaming** | Multiplayer (3+ players) | Major | 2 | 2~4인 배틀로얄 판정 엔진 |
-| **Gaming** | Spectator mode | Minor | 1 | 진행 중인 매치 실시간 관전 |
-| **DevOps** | Monitoring System | Major | 2 | Prometheus & Grafana 대시보드 |
-| **Total** | | | **22** | |
+| Category | Module | Type | Points | Description | 주요 담당자 |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Web** | Use a framework (FE/BE) | Major | 2 | React 및 NestJS 프레임워크 사용 | 팀 공동 |
+| **Web** | Real-time features | Major | 2 | WebSockets 기반 실시간 동기화 | hisong (설계) |
+| **Web** | User Interaction | Major | 2 | 채팅, 프로필, 친구 시스템 구현 | jishin (채팅/친구), jahong (프로필 UI) |
+| **Web** | Use an ORM | Minor | 1 | TypeORM을 통한 효율적인 데이터 관리 | jishin |
+| **User Management** | Standard user management | Major | 2 | 프로필 수정, 아바타 업로드(기본 아바타 포함), 친구+온라인 상태 | jahong |
+| **User Management** | Game statistics & match history | Minor | 1 | 전적/승률/매치 히스토리, 리더보드 | yuhyoon |
+| **User Management** | Remote authentication (OAuth 2.0) | Minor | 1 | 42 intra OAuth 2.0 로그인 | hisong |
+| **AI** | AI Opponent | Major | 2 | `architecture_design/AI_OPPONENT_SPEC.md` 기준 인간형 AI 대전, 유저 성능 기반 개인화 | 확인 필요 |
+| **Gaming** | Web-based game | Major | 2 | 실시간 웹 기반 산성비 타자 대전 | yuhyoon |
+| **Gaming** | Remote players | Major | 2 | 원격 사용자 간의 온라인 대전 | hisong |
+| **Gaming** | Multiplayer (3+ players) | Major | 2 | 2~4인 배틀로얄 판정 엔진 | 확인 필요 |
+| **Gaming** | Spectator mode | Minor | 1 | 진행 중인 매치 실시간 관전 | 확인 필요 |
+| **DevOps** | Monitoring System | Major | 2 | Prometheus & Grafana 대시보드 | kyouhele |
+| **Total** | | | **22** | | |
+
+### 모듈 선택 이유
+- **Web / Gaming 핵심 Major 모듈**(프레임워크, 실시간, 웹 기반 게임, 원격 플레이어)은 프로젝트 컨셉인 "실시간 타자 대전"을 성립시키는 데 필수적이라 선택했습니다.
+- **Multiplayer(3+)**·**Spectator mode**는 같은 게임 엔진에서 인원수·관전 로직만 확장하면 되어 구현 대비 가치가 높다고 판단했습니다.
+- **AI Opponent**는 상대가 없어도 게임을 즐길 수 있게 하고, 실제 유저 성능 데이터 기반 개인화로 기술적 난이도와 완성도를 함께 보여줄 수 있어 선택했습니다.
+- **User Management(Standard/전적/OAuth)**는 42 intra 계정 생태계와의 통합, 그리고 게임 전적이라는 프로젝트 핵심 가치를 뒷받침하기 위해 선택했습니다.
+- **Monitoring System**은 PM 역할(kyouhele)이 데브옵스 경험을 살릴 수 있는 영역이라 팀 역량과 흥미를 반영해 선택했습니다.
 
 ### 점수 집계 방식
 과제 기준(통과 14점 + 보너스 최대 5점)에 따라, 위 22점 중 **14점은 필수 통과분**, 나머지 8점 중 **최대 5점만 보너스로 인정**됩니다(과제 명세 §VII Bonus part). 즉 실질 반영 점수는 최대 **19점**이며, 나머지 3점은 초과분으로 상한에 걸립니다. 어떤 모듈을 "필수 14점"에 포함하고 어떤 것을 "보너스"로 분류하는지는 채점자 재량이므로, 위 13개 모듈 전부를 그대로 유지하고 데모 시 전부 시연 가능한 상태를 유지합니다.
