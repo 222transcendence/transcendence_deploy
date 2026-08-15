@@ -16,7 +16,7 @@ spec:
         - name: backend
           # Bump this tag as part of the release commit — keep in sync with the
           # git tag this k8s/ snapshot ships with (see k8s/README.md).
-          image: transcendence-backend:v0.0.14
+          image: transcendence-backend:v1.0.0
           imagePullPolicy: IfNotPresent
           ports: [{ containerPort: 3000 }]
           env:
