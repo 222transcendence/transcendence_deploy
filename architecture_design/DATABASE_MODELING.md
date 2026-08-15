@@ -3,7 +3,7 @@
 ## 1. Advanced ER Diagram
 \`\`\`mermaid
 erDiagram
-    USER ||--o{ MATCH_HISTORY : "hosts (legacy 2인)"
+    USER ||--o{ MATCH_HISTORY : "hosts"
     USER ||--o{ MATCH_PARTICIPANT : plays
     USER ||--o{ FRIENDSHIP : relates
     MATCH_HISTORY ||--o{ MATCH_PARTICIPANT : has
@@ -125,5 +125,5 @@ erDiagram
   `UserService.remove()`는 `userRepository.remove(user)`로 행 자체를 하드 삭제한다.
   `MatchParticipant.user`가 `ON DELETE CASCADE`라 탈퇴한 유저의 참가 기록(그 사람의 순위/HP
   행)만 함께 삭제된다 — 매치 자체나 다른 참가자의 기록은 남는다. `MatchHistory.hostUser`/
-  `guestUser`(2인 매치 하위호환 컬럼)도 `ON DELETE CASCADE`라, 탈퇴한 유저가 호스트/게스트로
-  기록된 **레거시 2인 매치는 통째로 삭제**된다는 차이가 있다.
+  `guestUser`(nullable 컬럼)도 `ON DELETE CASCADE`라, 탈퇴한 유저가 호스트/게스트로
+  기록된 매치는 통째로 삭제된다는 차이가 있다.

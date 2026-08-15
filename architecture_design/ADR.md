@@ -1,11 +1,5 @@
 # Architecture Decision Records (ADR)
 
-> **전면 재작성 (2026-08-14)**: 이전 버전의 ADR 001~004와 앞부분 "Testing & Monitoring
-> Guidance"는 Django Channels, Redis Cluster, `game_checkpoints` 테이블 기반 체크포인팅처럼
-> **실제로 구현된 적이 없는 설계**를 "Accepted"로 표기하고 있었다. 코드 기준으로 실제 결정과
-> 실제 상태를 다시 기록한다. 원래 제안됐던 설계 자체는 역사적 참고를 위해 "Superseded" 절에
-> 요약만 남긴다.
-
 ## ADR-001: 실시간 게임 엔진 — NestJS + Socket.IO 권위 서버
 * **Status**: Accepted (실제 구현과 일치)
 * **Context**: 실시간 타자 대전의 공정성을 위해 클라이언트 조작을 방지해야 하고, 42 프로젝트
@@ -56,7 +50,7 @@
   단일 인스턴스(`redis:7-alpine` 컨테이너 1개)로만 구성돼 있고 클러스터 모드가 아니므로, 이
   설계는 구현되지 않았다.
 
-## ADR-004: 백엔드는 현재 단일 인스턴스로만 운영 가능 (신규 기록 — 이전에 어디에도 문서화되지 않았던 실제 제약)
+## ADR-004: 백엔드는 단일 인스턴스로만 운영 가능
 * **Status**: Accepted (현재 상태의 기록), 향후 변경 여지 있음
 * **Context**: ADR-003의 인메모리 세션 저장 방식과, Socket.IO가 Redis 어댑터
   (`@socket.io/redis-adapter` 등) 없이 구성돼 있다는 점이 결합되면, 백엔드 컨테이너를 2개
@@ -95,21 +89,17 @@
       재시작되면 그 시점의 모든 진행 중 매치가 유실된다 — 이 리스크를 완화하는 자동 복구는
       아직 없다.
 
-## ADR-006: TCG → 산성비(Acid Rain) 타자 대전으로 전환 (신규 기록 — 실제로 일어난 결정이지만 어디에도 문서화되지 않았던 피벗)
+## ADR-006: 산성비(Acid Rain) 실시간 타자 대전 채택
 * **Status**: Accepted
-* **Context**: 프로젝트 초기에는 카드 기반 TCG(직업/캐릭터/카드 데이터, 주사위 판정)로
-  설계됐었다. 관련 스키마와 로직이 `backend#5`(Phase 6 EPIC) 등 초기 이슈에 남아있다.
-* **Decision**: 게임을 실시간 한국어 타자 대전("산성비")으로 전면 교체했다. 카드/캐릭터
-  테이블은 마이그레이션으로 삭제됐고, `AcidRainService`/`AcidRainGateway`가 새 판정 엔진의
-  중심이 됐다. `backend#5`는 obsolete 처리되어 닫혔다(이번 세션, `backend#99`가 사실상 대체).
+* **Context**: 실시간 멀티플레이 웹 게임이라는 요구사항에 부합하면서 한국어 타이핑이라는
+  차별화 요소를 살릴 수 있는 게임 장르가 필요했다.
+* **Decision**: 게임을 실시간 한국어 타자 대전("산성비")으로 구현했다. 카드/캐릭터 기반
+  설계를 배제하고 `AcidRainService`/`AcidRainGateway`를 판정 엔진의 중심으로 삼았다.
 * **Consequences**:
-    - 이 전환으로 인해 이전 설계 문서들(TCG 시절 API/DB/WebSocket 스펙)이 대거 stale해졌다 —
-      이번 문서 감사(2026-08-14)가 그 격차를 메우는 작업이다.
-    - `GAME_DESIGN.md`가 산성비 규칙의 정본이고, 나머지 문서(`WEBSOCKET_PROTOCOL.md`,
-      `AI_OPPONENT_SPEC.md`, `DATABASE_DESIGN.md`, `API_SPECIFICATION.md`)는 그 규칙을
-      코드 기준으로 반영하도록 이번에 갱신했다.
+    - `GAME_DESIGN.md`가 산성비 규칙의 정본이며, `WEBSOCKET_PROTOCOL.md`,
+      `AI_OPPONENT_SPEC.md`, `DATABASE_DESIGN.md`, `API_SPECIFICATION.md`가 이를 뒷받침한다.
 
-## ADR-007: Prometheus + Grafana 모니터링 스택 도입 (신규 기록)
+## ADR-007: Prometheus + Grafana 모니터링 스택 도입
 * **Status**: Accepted
 * **Context**: 게임 세션·API 요청에 대한 실시간 지표 가시성이 필요했다.
 * **Decision**: `docker-compose.yml`에 `prometheus`(scrape 대상: 백엔드 `GET /metrics`,
