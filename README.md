@@ -49,22 +49,22 @@
 ## 4. Modules & Point Calculation (Total: 22 Points)
 선택한 모듈 리스트 및 점수 계산입니다. (통과 기준: 14점, 보너스 상한 +5 — 아래 "점수 집계 방식" 참고) 각 모듈의 최종 검증 상태는 `CHECKLIST.md`와 평가 전 스모크 테스트 결과를 기준으로 확인합니다.
 
-| Category | Module | Type | Points | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| **Web** | Use a framework (FE/BE) | Major | 2 | React 및 NestJS 프레임워크 사용 |
-| **Web** | Real-time features | Major | 2 | WebSockets 기반 실시간 동기화 |
-| **Web** | User Interaction | Major | 2 | 채팅, 프로필, 친구 시스템 구현 |
-| **Web** | Use an ORM | Minor | 1 | TypeORM을 통한 효율적인 데이터 관리 |
-| **User Management** | Standard user management | Major | 2 | 프로필 수정, 아바타 업로드(기본 아바타 포함), 친구+온라인 상태 |
-| **User Management** | Game statistics & match history | Minor | 1 | 전적/승률/매치 히스토리, 리더보드 |
-| **User Management** | Remote authentication (OAuth 2.0) | Minor | 1 | 42 intra OAuth 2.0 로그인 |
-| **AI** | AI Opponent | Major | 2 | `architecture_design/AI_OPPONENT_SPEC.md` 기준 인간형 AI 대전, 유저 성능 기반 개인화 |
-| **Gaming** | Web-based game | Major | 2 | 실시간 웹 기반 산성비 타자 대전 |
-| **Gaming** | Remote players | Major | 2 | 원격 사용자 간의 온라인 대전 |
-| **Gaming** | Multiplayer (3+ players) | Major | 2 | 2~4인 배틀로얄 판정 엔진 |
-| **Gaming** | Spectator mode | Minor | 1 | 진행 중인 매치 실시간 관전 |
-| **DevOps** | Monitoring System | Major | 2 | Prometheus & Grafana 대시보드 |
-| **Total** | | | **22** | |
+| Category | Module | Type | Points | Owner | Description |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Web** | Use a framework (FE/BE) | Major | 2 | hisong | React 및 NestJS 프레임워크 사용 |
+| **Web** | Real-time features | Major | 2 | hisong | WebSockets 기반 실시간 동기화 |
+| **Web** | User Interaction | Major | 2 | jahong | 채팅, 프로필, 친구 시스템 구현 |
+| **Web** | Use an ORM | Minor | 1 | jishin | TypeORM을 통한 효율적인 데이터 관리 |
+| **User Management** | Standard user management | Major | 2 | jishin | 프로필 수정, 아바타 업로드(기본 아바타 포함), 친구+온라인 상태 |
+| **User Management** | Game statistics & match history | Minor | 1 | jahong | 전적/승률/매치 히스토리, 리더보드 |
+| **User Management** | Remote authentication (OAuth 2.0) | Minor | 1 | jishin | 42 intra OAuth 2.0 로그인 |
+| **AI** | AI Opponent | Major | 2 | kyouhele | `architecture_design/AI_OPPONENT_SPEC.md` 기준 인간형 AI 대전, 유저 성능 기반 개인화 |
+| **Gaming** | Web-based game | Major | 2 | yuhyoon | 실시간 웹 기반 산성비 타자 대전 |
+| **Gaming** | Remote players | Major | 2 | yuhyoon | 원격 사용자 간의 온라인 대전 |
+| **Gaming** | Multiplayer (3+ players) | Major | 2 | yuhyoon | 2~4인 배틀로얄 판정 엔진 |
+| **Gaming** | Spectator mode | Minor | 1 | yuhyoon | 진행 중인 매치 실시간 관전 |
+| **DevOps** | Monitoring System | Major | 2 | hisong | Prometheus & Grafana 대시보드 |
+| **Total** | | | **22** | | |
 
 ### 점수 집계 방식
 과제 기준(통과 14점 + 보너스 최대 5점)에 따라, 위 22점 중 **14점은 필수 통과분**, 나머지 8점 중 **최대 5점만 보너스로 인정**됩니다(과제 명세 §VII Bonus part). 즉 실질 반영 점수는 최대 **19점**이며, 나머지 3점은 초과분으로 상한에 걸립니다. 어떤 모듈을 "필수 14점"에 포함하고 어떤 것을 "보너스"로 분류하는지는 채점자 재량이므로, 위 13개 모듈 전부를 그대로 유지하고 데모 시 전부 시연 가능한 상태를 유지합니다.
