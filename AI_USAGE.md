@@ -11,6 +11,7 @@
 ## 2. Tools Used
 | Tool | Main Purpose | Output Type |
 | :--- | :--- | :--- |
+| Claude (Anthropic) / Claude Code | 아키텍처 문서 작성·정리, 백엔드/프론트엔드 코드 작성 보조, 디버깅 가설 정리, 설계 명세 검토 | 코드 패치, 문서 초안, 설계 검토 의견, 체크리스트 |
 | ChatGPT / Codex | 코드베이스 탐색, 문서 정리, 테스트·검증 절차 제안 | 코드 패치, 문서 초안, 체크리스트 |
 | GitHub Copilot | 반복적인 TypeScript/NestJS/React 코드 작성 보조 | 함수·컴포넌트 초안 |
 | Official documentation with search | 프레임워크/API 사용법 확인 | 근거 확인 및 구현 보정 |
@@ -25,6 +26,7 @@
 | AI opponent | 반응 지연, 타속, 실수율 기반 자동 단어 입력 방식 아이디어 정리 | 완벽하지 않은 사람다운 AI 대전 로직 초안 | 게임 밸런스와 난이도 수치는 팀원이 조정 |
 | Database / ORM | TypeORM 엔티티, 마이그레이션, MatchHistory JSONB 구조 점검 | 스키마 문서와 마이그레이션 검토 포인트 정리 | 마이그레이션 실행 및 API 응답으로 검증 |
 | Monitoring | Prometheus/Grafana 구성과 주요 메트릭 후보 정리 | 모니터링 대시보드 구성 항목과 검증 절차 보조 | 컨테이너 상태와 Prometheus query UI로 확인, Grafana 대시보드는 DevOps 모듈 검증 대상 |
+| Architecture docs | `architecture_design/*.md` 전 영역 — 게임 명세, DB 모델, API, WebSocket 프로토콜, AI 상대 명세 작성 및 실제 구현 기준으로 갱신 | Claude(Anthropic)로 문서 초안 생성 및 코드 기반 내용 정정 | 각 담당 팀원이 실제 코드와 대조하여 검토·머지 승인 후 반영 |
 | Documentation | README, AI_USAGE, 설계 문서 잔여 용어 점검 | 평가용 실행 가이드와 AI 사용 감사 로그 갱신 | PR 리뷰에서 팀원이 문서 정확성 확인 |
 
 ## 4. AI-assisted Artifacts

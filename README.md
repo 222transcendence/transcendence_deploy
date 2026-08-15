@@ -26,11 +26,11 @@
 ## 2. Team Information
 | Role | Name (Login) | Responsibilities |
 | :--- | :--- | :--- |
-| **Product Owner (PO)** | yuhyoon | 기능 정의 및 우선순위 관리, 최종 모듈 검증 |
-| **Project Manager (PM)** | kyouhele | 스케줄 관리, 데브옵스 모니터링 시스템 구축 |
-| **Technical Lead** | hisong | 시스템 아키텍처 설계, 실시간 웹소켓 로직 설계 |
-| **Developer** | jahong | 프론트엔드 UI/UX |
-| **Developer** | jishin | 백엔드 API 및 DB ORM 스키마 설계 |
+| **Product Owner (PO)** | yuhyoon | 기능 정의·백로그 관리·최종 모듈 검증; 게임 판정 로직(동시 탈락 타이브레이크·랭킹 산정) 구현 및 회귀 테스트 작성 |
+| **Project Manager (PM)** | kyouhele | 회의 일정·스프린트 조율·진행 추적·팀 커뮤니케이션 관리; AI 대전 모듈 전담 설계·구현(인간형 타이핑 AI, 난이도 스케일링, 유저 성능 기반 개인화) |
+| **Technical Lead** | hisong | 시스템 아키텍처 설계·기술 스택 결정·코드 리뷰; 실시간 게임 엔진(AcidRainService/Gateway) 및 WebSocket/Socket.IO 프로토콜 설계·구현 |
+| **Developer** | jahong | 프론트엔드 화면 초기 설계·구현(게임 보드·로비·대기실·프로필·전적/리더보드), 게임 소켓 컨텍스트 및 애니메이션 컴포넌트 |
+| **Developer** | jishin | 소셜 기능 백엔드 전담(친구 요청·수락·거절·온라인 상태, 채팅 API/Gateway); DB ORM 엔티티·마이그레이션 설계 |
 
 ### 개별 기여 내역 (Individual Contributions)
 > Git 커밋 이력(작성자 이메일 기준)을 근거로 작성했습니다. 세부 항목은 각 팀원 확인 후 갱신 예정입니다.
@@ -68,29 +68,22 @@
 ## 4. Modules & Point Calculation (Total: 22 Points)
 선택한 모듈 리스트 및 점수 계산입니다. (통과 기준: 14점, 보너스 상한 +5 — 아래 "점수 집계 방식" 참고) 각 모듈의 최종 검증 상태는 `CHECKLIST.md`와 평가 전 스모크 테스트 결과를 기준으로 확인합니다.
 
-| Category | Module | Type | Points | Description | 주요 담당자 |
+| Category | Module | Type | Points | Owner | Description |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Web** | Use a framework (FE/BE) | Major | 2 | React 및 NestJS 프레임워크 사용 | 팀 공동 |
-| **Web** | Real-time features | Major | 2 | WebSockets 기반 실시간 동기화 | hisong (설계) |
-| **Web** | User Interaction | Major | 2 | 채팅, 프로필, 친구 시스템 구현 | jishin (채팅/친구), jahong (프로필 UI) |
-| **Web** | Use an ORM | Minor | 1 | TypeORM을 통한 효율적인 데이터 관리 | jishin |
-| **User Management** | Standard user management | Major | 2 | 프로필 수정, 아바타 업로드(기본 아바타 포함), 친구+온라인 상태 | jahong |
-| **User Management** | Game statistics & match history | Minor | 1 | 전적/승률/매치 히스토리, 리더보드 | yuhyoon |
-| **User Management** | Remote authentication (OAuth 2.0) | Minor | 1 | 42 intra OAuth 2.0 로그인 | hisong |
-| **AI** | AI Opponent | Major | 2 | `architecture_design/AI_OPPONENT_SPEC.md` 기준 인간형 AI 대전, 유저 성능 기반 개인화 | 확인 필요 |
-| **Gaming** | Web-based game | Major | 2 | 실시간 웹 기반 산성비 타자 대전 | yuhyoon |
-| **Gaming** | Remote players | Major | 2 | 원격 사용자 간의 온라인 대전 | hisong |
-| **Gaming** | Multiplayer (3+ players) | Major | 2 | 2~4인 배틀로얄 판정 엔진 | 확인 필요 |
-| **Gaming** | Spectator mode | Minor | 1 | 진행 중인 매치 실시간 관전 | 확인 필요 |
-| **DevOps** | Monitoring System | Major | 2 | Prometheus & Grafana 대시보드 | kyouhele |
+| **Web** | Use a framework (FE/BE) | Major | 2 | hisong, jahong | React 및 NestJS 프레임워크 사용 |
+| **Web** | Real-time features | Major | 2 | hisong, yuhyoon | WebSockets 기반 실시간 동기화 |
+| **Web** | User Interaction | Major | 2 | jishin, jahong | 채팅, 프로필, 친구 시스템 구현 |
+| **Web** | Use an ORM | Minor | 1 | jishin, hisong | TypeORM을 통한 효율적인 데이터 관리 |
+| **User Management** | Standard user management | Major | 2 | jishin, jahong | 프로필 수정, 아바타 업로드(기본 아바타 포함), 친구+온라인 상태 |
+| **User Management** | Game statistics & match history | Minor | 1 | yuhyoon, jishin | 전적/승률/매치 히스토리, 리더보드 |
+| **User Management** | Remote authentication (OAuth 2.0) | Minor | 1 | jishin, hisong | 42 intra OAuth 2.0 로그인 |
+| **AI** | AI Opponent | Major | 2 | kyouhele, yuhyoon | `architecture_design/AI_OPPONENT_SPEC.md` 기준 인간형 AI 대전, 유저 성능 기반 개인화 |
+| **Gaming** | Web-based game | Major | 2 | yuhyoon, hisong | 실시간 웹 기반 산성비 타자 대전 |
+| **Gaming** | Remote players | Major | 2 | yuhyoon, hisong | 원격 사용자 간의 온라인 대전 |
+| **Gaming** | Multiplayer (3+ players) | Major | 2 | yuhyoon, kyouhele | 2~4인 배틀로얄 판정 엔진 |
+| **Gaming** | Spectator mode | Minor | 1 | yuhyoon, jahong | 진행 중인 매치 실시간 관전 |
+| **DevOps** | Monitoring System | Major | 2 | hisong, kyouhele | Prometheus & Grafana 대시보드 |
 | **Total** | | | **22** | | |
-
-### 모듈 선택 이유
-- **Web / Gaming 핵심 Major 모듈**(프레임워크, 실시간, 웹 기반 게임, 원격 플레이어)은 프로젝트 컨셉인 "실시간 타자 대전"을 성립시키는 데 필수적이라 선택했습니다.
-- **Multiplayer(3+)**·**Spectator mode**는 같은 게임 엔진에서 인원수·관전 로직만 확장하면 되어 구현 대비 가치가 높다고 판단했습니다.
-- **AI Opponent**는 상대가 없어도 게임을 즐길 수 있게 하고, 실제 유저 성능 데이터 기반 개인화로 기술적 난이도와 완성도를 함께 보여줄 수 있어 선택했습니다.
-- **User Management(Standard/전적/OAuth)**는 42 intra 계정 생태계와의 통합, 그리고 게임 전적이라는 프로젝트 핵심 가치를 뒷받침하기 위해 선택했습니다.
-- **Monitoring System**은 PM 역할(kyouhele)이 데브옵스 경험을 살릴 수 있는 영역이라 팀 역량과 흥미를 반영해 선택했습니다.
 
 ### 점수 집계 방식
 과제 기준(통과 14점 + 보너스 최대 5점)에 따라, 위 22점 중 **14점은 필수 통과분**, 나머지 8점 중 **최대 5점만 보너스로 인정**됩니다(과제 명세 §VII Bonus part). 즉 실질 반영 점수는 최대 **19점**이며, 나머지 3점은 초과분으로 상한에 걸립니다. 어떤 모듈을 "필수 14점"에 포함하고 어떤 것을 "보너스"로 분류하는지는 채점자 재량이므로, 위 13개 모듈 전부를 그대로 유지하고 데모 시 전부 시연 가능한 상태를 유지합니다.
