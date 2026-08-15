@@ -1,16 +1,13 @@
 # Game Sync Protocol & WebSocket Sequence (산성비 Acid Rain)
 
 ## 0. Lobby & Room Management Protocol
-`/ws/game/{room_id}` 연결 이전, 로비 화면은 별도 엔드포인트 `/ws/lobby`에 연결하여 방 목록과 입장/대기 상태를 동기화함. 메시지 envelope은 [3. Message Envelope Design](#3-message-envelope-design)과 동일한 `{ type, payload, seq }` 구조를 따름. (백엔드 구현 완료 — `transcendence_backend/src/lobby/` 참고, backend PR #64)
+`/ws/game/{room_id}` 연결 이전, 로비 화면은 별도 엔드포인트 `/ws/lobby`에 연결하여 방 목록과 입장/대기 상태를 동기화함. 메시지 envelope은 [3. Message Envelope Design](#message-envelope-design-lobby-raw-ws-전용)과 동일한 `{ type, payload, seq }` 구조를 따름.
 
 방 멤버십(`players[]`, §0.1)은 WebSocket 연결 인스턴스가 아니라 인증된 사용자(JWT)를 기준으로 서버에 보관됨. 따라서 클라이언트가 로비 화면에서 대기실 화면으로 이동하며 소켓을 재연결해도, 서버는 토큰으로 사용자를 식별해 기존 방 소속 상태를 유지하고 `GET_ROOM`에 응답할 수 있어야 함.
 
 ### 0.1. Room Object
 
-> **갱신 (2026-08-11, `transcendence_deploy#92`)**: `host`/`guest` 2슬롯 고정 구조를 `players[]`
-> 배열(2~4명)로 확장한다.
-> 방을 만든 사람의 방 관리 권한(강퇴/방 폭파)은 `hostUserId`로 유지한다. 아래가 정본이며, 구현은
-> `transcendence_backend#95`(로비 룸 모델 확장)가 담당한다.
+방을 만든 사람의 방 관리 권한(강퇴/방 폭파)은 `hostUserId`로 유지한다.
 
 ```json
 {
@@ -37,7 +34,7 @@
 | `CREATE_ROOM` | `{ maxPlayers? }` | 새 방 생성, 본인이 호스트가 됨. `maxPlayers`는 2~4(기본 4), 생략 시 기본값 |
 | `JOIN_ROOM` | `{ roomId }` | 대기중인 방에 참가자로 입장. `players.length >= maxPlayers`면 `ACTION_REJECTED{message:'Room is already full'}` |
 | `GET_ROOM` | `{ roomId }` | 특정 방의 현재 상태 조회. 인증된 사용자가 이미 `players`에 등록된 방이면 즉시 `ROOM_UPDATED` 응답 (대기실 페이지 진입/재연결 시 사용) |
-| `LEAVE_ROOM` | `{ roomId }` | 방 퇴장 (호스트 퇴장 시 방 폭파 — 호스트 위임은 `transcendence_backend#68` 별도 이슈) |
+| `LEAVE_ROOM` | `{ roomId }` | 방 퇴장 (호스트 퇴장 시 방 폭파 또는 호스트 위임) |
 | `SET_READY` | `{ roomId, ready }` | 준비 완료/취소 토글 |
 
 ### 0.3. Server → Client Messages
@@ -72,7 +69,7 @@ sequenceDiagram
     C1->>S: SET_READY (true)
     C2->>S: SET_READY (true)
     C3->>S: SET_READY (true)
-    Note over S: 최소 2명 이상 참가 + 전원 ready 시 시작 (호스트가 인원 미달로 대기 종료 가능 여부는 transcendence_backend#95에서 결정)
+    Note over S: 최소 2명 이상 참가 + 전원 ready 시 시작
     S->>C1: GAME_START (roomId)
     S->>C2: GAME_START (roomId)
     S->>C3: GAME_START (roomId)
@@ -82,20 +79,15 @@ sequenceDiagram
 §0(로비, raw WebSocket)의 모든 메시지는 다음 구조를 따름. §5(채팅)·§6(게임)은 Socket.io named event +
 플랫 payload 방식이라 이 봉투를 쓰지 않음.
 
-\`\`\`json
+```json
 {
   "type": "ACTION_REJECTED, STATE_UPDATE, NOTIFICATION",
   "payload": { ... },
   "seq": 102  // 클라이언트 측 메시지 순서 보장용 시퀀스 번호
 }
-\`\`\`
+```
 
-## Reconnection Logic (실제 구현, `ADR.md` ADR-003/ADR-005 참고)
-
-> **정정 (2026-08-14)**: 아래는 실제로 구현된 적 없는 Redis Cluster `MOVED`/`ASK` 처리와
-> `game_checkpoints` 기반 체크포인트 복구를 서술하고 있었다 — Redis는 단일 인스턴스이고,
-> 게임 세션의 권위 있는 상태는 애초에 Redis가 아니라 백엔드 프로세스 메모리(`AcidRainService`의
-> `Map<roomId, AcidRainSession>`)에 있다. 실제 복구 모델은 다음과 같다.
+## Reconnection Logic (`ADR.md` ADR-003/ADR-005 참고)
 
 - **Heartbeat**: Socket.IO 기본 ping/pong 메커니즘을 그대로 사용한다.
 - **State Recovery**: 재접속 시 서버는 **인메모리 세션**(`AcidRainService.sessions`)의 현재
@@ -103,7 +95,7 @@ sequenceDiagram
   백업 직렬화본으로, 인메모리 세션 자체가 유실된 경우(예: 프로세스 재시작)에만 참고 대상이 될
   수 있으나, 자동으로 이를 다시 읽어 세션을 복원하는 로직은 없다.
 - **그레이스 타이머 없음**: 연결이 끊겨도 매치를 일시정지하거나 강제 탈락시키지 않는다
-  (`backend#161`, §6.3 "레이스 컨디션 & 재접속 처리" 절, `ADR.md` ADR-005). 재접속은 유예
+  (§6.3 "레이스 컨디션 & 재접속 처리" 절, `ADR.md` ADR-005). 재접속은 유예
   시간 제한 없이 아무 때나 `join_room` 재전송으로 가능하다.
 - **알려진 한계**: 백엔드가 재시작되면 그 시점의 모든 진행 중 매치가 통째로 유실된다 — 이를
   완화하는 자동 체크포인트/복구 시스템은 제안됐었지만 구현되지 않았다(`ADR.md` ADR-005).
@@ -170,7 +162,7 @@ Chat WebSocket은 `/chat` namespace에서 동작합니다. 연결 시 반드시 
 ```
 
 `type`은 `"NORMAL"` \| `"INVITE"` \| `"SYSTEM"` 중 하나다. `"SYSTEM"`은 특정 유저가 보낸 메시지가 아니라
-서버가 생성한 알림(대기실 입장/퇴장 등, `#67`)이므로 `sender`가 `null`이다. 클라이언트는 렌더링 전에
+서버가 생성한 알림(대기실 입장/퇴장 등)이므로 `sender`가 `null`이다. 클라이언트는 렌더링 전에
 반드시 `sender`가 `null`일 수 있음을 처리해야 한다.
 
 ```json
@@ -273,12 +265,8 @@ sequenceDiagram
 
 ### 6.3 이벤트 정의 — 산성비(Acid Rain) 타자 대전 (2~4인 N인 배틀로얄, 구현 완료)
 
-> **2026-08-14 갱신**: 이 절은 실제 코드(`transcendence_backend`의 `acid-rain.gateway.ts`/
-> `acid-rain.service.ts`/`acid-rain.interface.ts`)를 기준으로 다시 작성됐다. 직전 버전은
-> "현재 구현: 1:1"이라고 표기하고 N인 확장을 `backend#136` 대기 항목으로 남겨뒀지만, `backend#136`
-> (전략형 다중 ACTIVE 단어 엔진)과 `backend#165`(세션 모델의 `participants[]` 배열 전면 재작성)가
-> 모두 머지되어 **2~4인 배틀로얄이 실제로 동작한다** — `AcidRainSession`에는 더 이상
-> `host`/`guest` 필드가 없다.
+> 현재 구현은 `AcidRainSession`의 `participants[]` 배열로 2~4인 배틀로얄 참가자를 관리하며,
+> `host`/`guest` 필드를 사용하지 않는다.
 
 규칙 상세는 `GAME_DESIGN.md`를 정본으로 한다.
 
@@ -298,7 +286,7 @@ Redis 세션 키: `game:acidroom:{roomId}`
 | `join_room` | `{ roomId: string }` | 소켓 룸 입장/재입장. 방 인원이 2~4명이고 전원이 소켓 룸에 입장하면 `match_ready` 브로드캐스트(2명 미만이거나 4명 초과면 거부 — `join_room rejected — unsupported player count` 로그) |
 | `leave_room` | `{ roomId: string }` | 명시적 퇴장. 매치가 `IN_PROGRESS`면 해당 참가자만 즉시 탈락(`FORFEIT`) 처리 — 생존자가 1명 이하로 남을 때만 매치 자체가 끝난다. N인전에서 1명이 나가도 나머지는 계속 진행 |
 | `word_submit` | `{ roomId: string, wordId: string, text: string, clientTs: number, attemptId: string }` | 단어 입력 제출. `wordId`로 어떤 단어에 대한 제출인지 구분. `clientTs`는 텔레메트리용, 판정에는 미사용. `attemptId`는 **필수** — 서버가 이 값으로 재전송(replay)을 구분/방지한다 |
-| `typing_progress` | `{ roomId: string, partialText: string, wordId?: string, clientTs?: number }` | 실시간 입력 진행도 전송(`#71`). 서버가 `opponent_typing`으로 같은 방에 재브로드캐스트한다 |
+| `typing_progress` | `{ roomId: string, partialText: string, wordId?: string, clientTs?: number }` | 실시간 입력 진행도 전송. 서버가 `opponent_typing`으로 같은 방에 재브로드캐스트한다 |
 
 #### 서버 → 클라이언트
 
@@ -309,12 +297,12 @@ Redis 세션 키: `game:acidroom:{roomId}`
 | `word_spawn` | `{ wordId, text, keystrokes, lane, fallDurationMs, spawnedAt, landAt, damage }` | 낙하 단어 스트림. 동시 활성(`ACTIVE`) 단어 상한은 참가자 수에 비례한다(`WORDS_PER_PLAYER(5) * 참가자수` — 2인 10개, 4인 20개, `GAME_DESIGN.md` §3.3b). `keystrokes`는 2벌식 실제 타건 횟수(§3.2). `lane`은 서버가 배정하는 가로 슬롯 인덱스 — 가능하면 인접 레인을 피하고, 활성 단어 수가 레인 수(5)를 넘으면 한 레인에 여러 단어가 쌓일 수 있다(`GAME_DESIGN.md` §3.3b). `landAt`(ISO8601, 바닥 도달 예정 시각)과 `damage`(서버 확정 공격력)는 항상 포함된다 |
 | `word_cleared` | `{ wordId, clearedBy, targetParticipantId?, damage, hp: HpByParticipantId, targetHpByParticipantId: HpByParticipantId }` | 누군가 먼저 정확히 입력해 단어가 지워짐. `targetParticipantId`는 생존해 있는 다른 참가자 중 서버가 무작위로 고른 데미지 대상 — 생존한 타 참가자가 없으면(예: 2인전에서 상대가 이미 탈락) 필드 자체가 생략되고 `damage`는 0. `hp`와 `targetHpByParticipantId`는 현재 동일한 갱신된 전체 참가자 HP 맵을 가리키는 중복 필드다(과거 1:1 시절의 이름을 유지) |
 | `word_missed` | `{ wordId, splashDamage, hp: HpByParticipantId }` | 아무도 못 지운 단어가 바닥에 닿음. 생존자 전원에게 스플래시 데미지 적용. `hp`는 갱신된 전체 참가자 HP 맵 |
-| `submit_rejected` | `{ wordId, reason: 'ALREADY_CLEARED' \| 'NOT_FOUND' \| 'WRONG_TEXT' \| 'PLAYER_ELIMINATED' }` | 제출자에게만 전송(레이스 패배/오타/탈락자의 제출 시도, `backend#157`) |
+| `submit_rejected` | `{ wordId, reason: 'ALREADY_CLEARED' \| 'NOT_FOUND' \| 'WRONG_TEXT' \| 'PLAYER_ELIMINATED' }` | 제출자에게만 전송(레이스 패배/오타/탈락자의 제출 시도) |
 | `player_eliminated` | `{ userId, rank, finalHp }` | **N인 배틀로얄 탈락 이벤트** — HP가 0이 되는 즉시(스플래시/타겟 데미지/명시적 기권 무관) 방 전체에 브로드캐스트된다. `userId`는 실제로는 `participantId` 값. `rank`는 그 시점까지의 생존자/탈락 순서를 반영한 잠정 순위이며 매치가 끝나면 `match_end.ranking`의 최종값과 일치한다 |
 | `state_sync` | `{ roomId, participants: ParticipantState[], hp: HpByParticipantId, activeWords: ActiveWordStatePayload[], elapsedMs, spawnIntervalMs, now }` | 재접속(또는 관전 입장, §6.7) 시 전체 스냅샷 |
-| `opponent_disconnected` | `{ userId }` | 참가자 연결 끊김 알림(이름은 1:1 시절 유지, N인전에서도 그대로 사용). 강제 탈락/승리 처리 데드라인은 없다(`backend#161`) |
+| `opponent_disconnected` | `{ userId }` | 참가자 연결 끊김 알림(이름은 1:1 시절 유지, N인전에서도 그대로 사용). 강제 탈락/승리 처리 데드라인은 없다 |
 | `opponent_reconnected` | `{ userId }` | 참가자 재접속 복귀 |
-| `opponent_typing` | `{ participantId, partialText, wordId?, completedKeystrokes?, totalKeystrokes?, phase?: 'IDLE'\|'REACTION'\|'TYPING'\|'CORRECTING', stateVersion? }` | 상대방(AI 포함)의 실시간 입력 진행도(`#71`). AI 참가자의 경우 2벌식 IME 조합 상태까지 반영한 키스트로크 레벨 페이로드가 온다 |
+| `opponent_typing` | `{ participantId, partialText, wordId?, completedKeystrokes?, totalKeystrokes?, phase?: 'IDLE'\|'REACTION'\|'TYPING'\|'CORRECTING', stateVersion? }` | 상대방(AI 포함)의 실시간 입력 진행도. AI 참가자의 경우 2벌식 IME 조합 상태까지 반영한 키스트로크 레벨 페이로드가 온다 |
 | `ai_monitor_snapshot` | `AiMonitorSnapshot` (§6.8) | **AI 연습전 전용.** AI의 의사결정 과정을 시각화하기 위한 스냅샷 — `kind: 'FULL'\|'DECISION'\|'PHASE'\|'TERMINAL'`. AI_PRACTICE 모드가 아닌 일반 PvP 매치에서는 전송되지 않는다 |
 | `match_end` | `{ roomId, winnerId, reason: 'KO' \| 'TIME_LIMIT' \| 'FORFEIT', finalHp: HpByParticipantId, ranking: RankingEntry[], wordsTyped: Record<string, number>, durationSec }` | 매치 종료. `winnerId`는 단독 승자가 없으면(시간초과 동률) `null`. `ranking`은 `{ participantId, rank }[]`(`finalHp`는 별도 필드에서 조회) |
 | `error` | `{ message: string }` | 인증/검증 실패 등 일반 오류 |
@@ -419,17 +407,17 @@ Redis 세션 키: `game:acidroom:{roomId}`
   > 이 순서 보장은 **백엔드 인스턴스 1대** 기준이다. Socket.io를 여러 인스턴스로 수평 확장할 경우
   > Redis adapter로 브로드캐스트해도 같은 방의 참가자들이 서로 다른 인스턴스에 붙어있으면 판정
   > 순서가 보장되지 않는다 — 확장 시 방 단위 sticky 라우팅 또는 Redis 기반 분산 락이 필요하다.
-- `disconnect` 시 강제 탈락/승리 처리 데드라인은 없다(`backend#161`) — 방은 그대로 유지되고
+- `disconnect` 시 강제 탈락/승리 처리 데드라인은 없다 — 방은 그대로 유지되고
   나머지 참가자에게 `opponent_disconnected` 알림만 간다. 끊긴 참가자는 소켓이 없어 스스로
   공격(단어 제출)은 못 하지만, 다른 생존자의 타겟 선택/스플래시 데미지는 연결 여부와 무관하게
-  적용되므로 계속 맞을 수는 있다 — 이미 자연스러운 페널티다. 언제든 `join_room` 재전송으로
+  적용되므로 계속 맞을 수는 있다. 언제든 `join_room` 재전송으로
   `state_sync` 복구가 가능하고, 재접속 시 `opponent_reconnected`가 브로드캐스트된다. 매치
   자체가 `MATCH_DURATION_MS`(180초) 하드 타임아웃을 가지고 있어 무한정 멈춰있을 수 없다.
   명시적으로 `leave_room`을 보내는 경우(스스로 나가겠다고 한 것)는 다르게 취급해 그 참가자만
   즉시 탈락 처리한다(`forfeitParticipant`).
 - 두 플레이어가 `join_room`을 거의 동시에 보내면 서버가 방별로 join 처리를 직렬화해 레이스를
-  방지한다(`backend#144`). 클라이언트도 `match_ready`/`state_sync`를 받을 때까지 `join_room`을
-  주기적으로 재전송하는 자가복구 로직을 둔다(`frontend`, `backend#144` 대응).
+  방지한다. 클라이언트도 `match_ready`/`state_sync`를 받을 때까지 `join_room`을 주기적으로
+  재전송하는 자가복구 로직을 둔다.
 
 #### 게임 흐름 시퀀스 (2인 예시 — 3~4인도 참가자 수만 늘어날 뿐 흐름은 동일하고, 중간 탈락 시 `player_eliminated`가 추가로 발생한다)
 
@@ -496,41 +484,37 @@ sequenceDiagram
 }
 ```
 
-### 6.5 구현 상태 (2026-08-14 기준)
+### 6.5 현재 구현 범위
 
 **핵심 산성비 엔진**은 §6.3에 정의된 2~4인 N인 배틀로얄 계약으로 **완료**됐다.
 
-| 항목 | 현재 상태 |
+| 항목 | 현재 구조 |
 |---|---|
-| `AcidRainGateway`(`/game` 네임스페이스, §6.3 이벤트) | **완료** |
-| `AcidRainService`(스폰 루프, HP/데미지, 레인 배정, Redis `game:acidroom:{roomId}`) | **완료** — keystrokes 기반(§3.5/§3.6) |
-| 참가자 계약을 HUMAN/AI 공통 표현(`participants[]`, `HpByParticipantId`)으로 정렬 | **완료** — `backend#109`/PR #138 |
-| 세션 모델을 `host`/`guest` 2슬롯에서 `participants[]` 배열로 전면 재작성 | **완료** — `backend#136`, `backend#165` |
-| N인(2~4) 배틀로얄 판정 경로(다중 `ACTIVE` 단어, 참가자 수 비례 단어량, 인접 레인 회피) | **완료** — `backend#136`, `backend#174`/`#175` |
-| `player_eliminated` 실시간 탈락 브로드캐스트 | **완료** — `deploy#68` 검증 과정에서 발견된 누락을 메움(이전에는 `match_end`까지 탈락 사실이 전달되지 않았다) |
-| AI 연습전(로비 전용, PvP 랭킹과 분리) 세션 생성 + 개인화 프로필 | **완료** — `backend#106`/`#166`/`#176`, 상세는 `AI_OPPONENT_SPEC.md` |
-| 관전 모드(§6.7, 참가자 수 무관) | **완료** — `deploy#70` |
-| 호스트 위임 시 채팅 시스템 메시지 | **완료** — `backend#172` |
-| 아바타(`ParticipantPublic.avatar`) | **완료** — `backend#171`/`frontend#89` |
-| `word-bank.ts`(한국어 단어 큐레이션) | **완료** — 400개, `keystrokes` 기반 난이도 |
-| 프론트엔드 이벤트 계약(`useAcidRainSocket.ts`, `types/acidRain.ts`) | **완료** |
-| 통합 배포 검증(3~4인 동시접속 시나리오) | 진행 중 — `deploy#68` |
+| `AcidRainGateway`(`/game` 네임스페이스, §6.3 이벤트) | §6.3 계약 제공 |
+| `AcidRainService` | 스폰 루프, HP/데미지, 레인 배정, Redis snapshot persistence |
+| 참가자 계약 | HUMAN/AI 공통 `participants[]`, `HpByParticipantId` |
+| 세션 모델 | `participants[]` 배열 기반 |
+| 배틀로얄 판정 | 2~4인, 다중 `ACTIVE` 단어, 참가자 수 비례 단어량, 인접 레인 회피 |
+| 실시간 이벤트 | `player_eliminated`, `match_end` 등 §6.3 계약 |
+| AI 연습전 | 로비 전용, PvP 랭킹과 분리, 개인화 프로필 지원 |
+| 관전 모드 | §6.7 계약에 따른 읽기 전용 입장 |
+| 프론트엔드 계약 | `useAcidRainSocket.ts`, `types/acidRain.ts`에서 §6.3 이벤트 구독 |
 
-### 6.6 프론트엔드 구현 파일 (계획)
+### 6.6 프론트엔드 구현 파일
 
-| 파일 | 역할 | 상태 |
-|---|---|---|
-| `src/context/GameSocketContext.tsx` | 소켓 연결/인증 상태 관리, Provider | 유지 |
-| `src/hooks/useAcidRainSocket.ts` | roomId별 join/leave + §6.3 이벤트 핸들러 구독 | 신규 |
-| `src/types/acidRain.ts` | §6.3 이벤트 페이로드 타입 + Server/ClientToServerEvents 맵 | 신규 |
-| `src/pages/GameBoardPage.tsx` | 게임 보드 페이지, `/game/:roomId` — 단어 낙하 렌더링 + 입력창 + HP 바 | 재작성 |
-| `src/pages/GameComingSoonPage.tsx` | 배포 공백을 메우는 placeholder | 신규(임시) |
-| `src/pages/SpectateBoardPage.tsx` | 관전 전용 읽기 화면, `/spectate/:roomId` (§6.7) | 신규 — `deploy#70` |
+| 파일 | 역할 |
+|---|---|
+| `src/context/GameSocketContext.tsx` | 소켓 연결/인증 상태 관리, Provider |
+| `src/hooks/useAcidRainSocket.ts` | roomId별 join/leave 및 §6.3 이벤트 핸들러 구독 |
+| `src/types/acidRain.ts` | §6.3 이벤트 payload 타입 및 Server/ClientToServerEvents 맵 |
+| `src/pages/GameBoardPage.tsx` | `/game/:roomId` 게임 보드, 단어 낙하·입력·HP 표시 |
+| `src/pages/GameComingSoonPage.tsx` | 게임 화면 placeholder |
+| `src/pages/SpectateBoardPage.tsx` | `/spectate/:roomId` 관전 전용 읽기 화면 |
 
-### 6.7 관전 모드 (Spectator Mode) — `deploy#70`
+### 6.7 관전 모드 (Spectator Mode)
 
 이미 `IN_PROGRESS`인 방을 제3자가 읽기 전용으로 지켜볼 수 있는 기능이다. 관전자는 절대
-`room.players`나 매치 세션(`AcidRainSession.host`/`.guest`)에 등록되지 않는다 — 소켓 룸
+`room.players`나 매치 세션의 `participants[]`에 등록되지 않는다 — 소켓 룸
 (`game:{roomId}`)에만 입장해 같은 브로드캐스트를 받는다. 이렇게 분리하는 이유는 연결 종료 시
 FORFEIT 판정 로직(§6.3 `leave_room`/disconnect 처리)이 `room.players` 소속 여부로 승패를
 가르기 때문 — 관전자를 여기 섞으면 소켓이 끊길 때 엉뚱하게 상대를 승자 처리하는 버그가 생긴다.
@@ -568,12 +552,12 @@ FORFEIT 판정 로직(§6.3 `leave_room`/disconnect 처리)이 `room.players` �
 - `leave_spectate` 처리 시, 그리고 관전 중 소켓이 abrupt 하게 끊겼을 때(`handleDisconnect`에서
   `spectatingRoomId`가 설정돼 있는 경우) — `"{닉네임} 님이 관전을 종료했습니다."`
 
-참가자 입장/퇴장에는 이런 시스템 메시지가 없다(기존 §6.3 흐름은 변경하지 않음) — 이 메시지는
+참가자 입장/퇴장에는 이런 시스템 메시지가 없다 — 이 메시지는
 관전자 전용으로 새로 추가된 것이다.
 
 #### 관전 가능한 방 목록 (Lobby, raw-ws `/ws/lobby`)
 
-기존 §0의 `LIST_ROOMS`/`ROOM_LIST`는 `WAITING` 상태 방만 반환한다(관전 대상은 `IN_GAME`이라
+§0의 `LIST_ROOMS`/`ROOM_LIST`는 `WAITING` 상태 방만 반환한다(관전 대상은 `IN_GAME`이라
 의미상 다른 목록). 별도 요청/응답 쌍을 추가한다:
 
 | Event | Payload | Description |
