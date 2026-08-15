@@ -9,20 +9,20 @@ services:
       - "127.0.0.1:15432:5432"
   redis:
     ports:
-      - "127.0.0.1:6379:6379"
+      - "127.0.0.1:16379:6379"
   backend:
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:13000:3000"
   frontend:
     ports:
-      - "127.0.0.1:8080:80"
+      - "127.0.0.1:18080:80"
   node-exporter:
     ports:
-      - "127.0.0.1:9100:9100"
+      - "127.0.0.1:19100:9100"
 
   prometheus:
     ports:
-      - "127.0.0.1:9090:9090"
+      - "127.0.0.1:19090:9090"
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--web.route-prefix=/prometheus/"
@@ -30,7 +30,7 @@ services:
 
   grafana:
     ports:
-      - "127.0.0.1:3001:3000"
+      - "127.0.0.1:13001:3000"
     environment:
       GF_SERVER_ROOT_URL: https://acidrain.hijae.dev/grafana/
       GF_SERVER_SERVE_FROM_SUB_PATH: "true"
