@@ -26,11 +26,11 @@
 ## 2. Team Information
 | Role | Name (Login) | Responsibilities |
 | :--- | :--- | :--- |
-| **Product Owner (PO)** | yuhyoon | 기능 정의 및 우선순위 관리, 최종 모듈 검증 |
-| **Project Manager (PM)** | kyouhele | 스케줄 관리, 데브옵스 모니터링 시스템 구축 |
-| **Technical Lead** | hisong | 시스템 아키텍처 설계, 실시간 웹소켓 로직 설계 |
-| **Developer** | jahong | 프론트엔드 UI/UX |
-| **Developer** | jishin | 백엔드 API 및 DB ORM 스키마 설계 |
+| **Product Owner (PO)** | yuhyoon | 기능 정의·백로그 관리·최종 모듈 검증; 게임 판정 로직(동시 탈락 타이브레이크·랭킹 산정) 구현 및 회귀 테스트 작성 |
+| **Project Manager (PM)** | kyouhele | 회의 일정·스프린트 조율·진행 추적·팀 커뮤니케이션 관리; AI 대전 모듈 전담 설계·구현(인간형 타이핑 AI, 난이도 스케일링, 유저 성능 기반 개인화) |
+| **Technical Lead** | hisong | 시스템 아키텍처 설계·기술 스택 결정·코드 리뷰; 실시간 게임 엔진(AcidRainService/Gateway) 및 WebSocket/Socket.IO 프로토콜 설계·구현 |
+| **Developer** | jahong | 프론트엔드 화면 초기 설계·구현(게임 보드·로비·대기실·프로필·전적/리더보드), 게임 소켓 컨텍스트 및 애니메이션 컴포넌트 |
+| **Developer** | jishin | 소셜 기능 백엔드 전담(친구 요청·수락·거절·온라인 상태, 채팅 API/Gateway); DB ORM 엔티티·마이그레이션 설계 |
 
 ---
 
