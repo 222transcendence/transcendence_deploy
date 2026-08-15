@@ -12,6 +12,7 @@
 | Tool | Main Purpose | Output Type |
 | :--- | :--- | :--- |
 | Claude (Anthropic) / Claude Code | 아키텍처 문서 작성·정리, 백엔드/프론트엔드 코드 작성 보조, 디버깅 가설 정리, 설계 명세 검토 | 코드 패치, 문서 초안, 설계 검토 의견, 체크리스트 |
+| ChatGPT / Codex | 코드베이스 탐색, 문서 정리, 테스트·검증 절차 제안 | 코드 패치, 문서 초안, 체크리스트 |
 | GitHub Copilot | 반복적인 TypeScript/NestJS/React 코드 작성 보조 | 함수·컴포넌트 초안 |
 | Official documentation with search | 프레임워크/API 사용법 확인 | 근거 확인 및 구현 보정 |
 
