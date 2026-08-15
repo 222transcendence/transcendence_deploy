@@ -1,9 +1,9 @@
 # Professional Database Modeling (PostgreSQL Optimized)
 
 ## 1. Advanced ER Diagram
-\`\`\`mermaid
+```mermaid
 erDiagram
-    USER ||--o{ MATCH_HISTORY : "hosts (legacy 2인)"
+    USER ||--o{ MATCH_HISTORY : "hosts"
     USER ||--o{ MATCH_PARTICIPANT : plays
     USER ||--o{ FRIENDSHIP : relates
     MATCH_HISTORY ||--o{ MATCH_PARTICIPANT : has
@@ -41,7 +41,7 @@ erDiagram
         int finalHp
         int rank "1=우승, 공동순위 허용"
     }
-    %% N인(2~4) 매치의 참가자별 결과 — backend#91. DATABASE_DESIGN.md 참고.
+    %% N인(2~4) 매치의 참가자별 결과.
 
     WORD_ATTEMPT_RECORD {
         uuid id PK
@@ -86,7 +86,7 @@ erDiagram
         int keystrokes
         boolean isActive
     }
-    %% 단어 은행은 정적 배열이 아니라 실제 DB 테이블이다(backend#72) — 아래 §3 참고.
+    %% 단어 은행은 정적 배열이 아니라 실제 DB 테이블이다 — 아래 §3 참고.
 
     FRIENDSHIP {
         uuid id PK
@@ -96,14 +96,11 @@ erDiagram
         timestamp updatedAt
     }
     %% BLOCKED 상태는 없다 — 실제 enum(FriendStatus)은 PENDING/ACCEPTED 둘뿐이며, 거절은 별도
-    %% 상태 없이 PENDING row를 삭제하는 방식으로 처리한다(DATABASE_DESIGN.md 참고).
-\`\`\`
+    %% 상태 없이 PENDING row를 삭제하는 방식으로 처리한다.
+```
 
 ## 2. Implementation Strategies
 
-> 아래 §2/§3는 애초에 "이렇게 하면 좋다"는 권장 전략 메모이지, 이미 구현됐다는 서술이 아니다.
-> 실제로 구현되지 않은 항목(`version` 낙관적 잠금, 2FA)은 그렇게 명시한다 — 코드에 존재하지
-> 않으므로, 실제로 필요하면 프로젝트 보드에 별도 이슈로 등록해야 한다.
 
 ### 2.1. Concurrency Control
 - **Optimistic Locking**: (미구현) 게임 결과 기록 시 `version` 필드를 활용해 데이터 충돌을 막는
@@ -125,5 +122,5 @@ erDiagram
   `UserService.remove()`는 `userRepository.remove(user)`로 행 자체를 하드 삭제한다.
   `MatchParticipant.user`가 `ON DELETE CASCADE`라 탈퇴한 유저의 참가 기록(그 사람의 순위/HP
   행)만 함께 삭제된다 — 매치 자체나 다른 참가자의 기록은 남는다. `MatchHistory.hostUser`/
-  `guestUser`(2인 매치 하위호환 컬럼)도 `ON DELETE CASCADE`라, 탈퇴한 유저가 호스트/게스트로
-  기록된 **레거시 2인 매치는 통째로 삭제**된다는 차이가 있다.
+  `guestUser`(nullable 컬럼)도 `ON DELETE CASCADE`라, 탈퇴한 유저가 호스트/게스트로
+  기록된 매치는 통째로 삭제된다는 차이가 있다.

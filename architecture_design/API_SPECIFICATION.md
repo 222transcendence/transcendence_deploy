@@ -6,15 +6,12 @@
 `/api/chat/*`, `/api/game/*`). nginx의 `location /api` 블록이 이 접두사 기준으로 백엔드에 프록시하므로,
 컨트롤러가 접두사를 빠뜨리면 프론트가 문서대로 호출해도 실제로는 404가 난다.
 
-**2026-08-11 발견/수정**: `GameController`가 `@Controller('game')`로 선언돼 있어 실제 라우트가
-`/game/*`였고, 문서(`API_SPECIFICATION.md`, `WEBSOCKET_PROTOCOL.md` §6.4)와 프론트(`api/gameStats.ts`)는
-이미 `/api/game/*`를 전제로 하고 있어서 전적/리더보드 API가 실제로는 항상 404였다.
-`@Controller('api/game')`로 수정해 통일함. 새 컨트롤러를 추가할 때는 반드시 `api/` 접두사를 포함할 것.
+새 컨트롤러를 추가할 때는 반드시 `api/` 접두사를 포함할 것.
 
 ## 1. Request/Response Envelope
 모든 응답은 일관된 형식을 유지함.
 
-\`\`\`json
+```json
 {
   "timestamp": "2026-05-12T10:00:00Z",
   "status": 200,
@@ -214,7 +211,7 @@ All endpoints below are prefixed with `/api/chat` and require **JWT Bearer Token
 - **Description**: 로그인한 사용자 본인의 전체 프로필 정보를 가져옴. (비밀번호 제외)
 - **Authentication**: JWT 필수
 - **Success Response (200 OK)**:
-    \`\`\`json
+    ```json
     {
       "timestamp": "2026-05-29T10:00:00Z",
       "status": 200,
@@ -231,13 +228,13 @@ All endpoints below are prefixed with `/api/chat` and require **JWT Bearer Token
       },
       "error": null
     }
-    \`\`\`
+    ```
 
 ### [GET] /api/users/{id}
 - **Description**: 특정 사용자 ID에 해당하는 타인의 프로필 정보를 가져옴. 민감한 정보(이메일, 비밀번호)는 제외하고 공개 가능한 데이터만 반환함.
 - **Authentication**: JWT 필수
 - **Success Response (200 OK)**:
-    \`\`\`json
+    ```json
     {
       "timestamp": "2026-05-29T10:00:00Z",
       "status": 200,
@@ -253,7 +250,7 @@ All endpoints below are prefixed with `/api/chat` and require **JWT Bearer Token
       },
       "error": null
     }
-    \`\`\`
+    ```
 - **Error Codes**:
     - \`404\`: 존재하지 않는 사용자 ID
 
@@ -261,14 +258,14 @@ All endpoints below are prefixed with `/api/chat` and require **JWT Bearer Token
 - **Description**: 로그인한 본인의 \`nickname\` 또는 \`avatar\`를 수정함. 닉네임 수정 시 중복 검사를 거침.
 - **Authentication**: JWT 필수
 - **Request Body**:
-    \`\`\`json
+    ```json
     {
       "nickname": "new_nickname",
       "avatar": "new_avatar.png"
     }
-    \`\`\`
+    ```
 - **Success Response (200 OK)**:
-    \`\`\`json
+    ```json
     {
       "timestamp": "2026-05-29T10:00:00Z",
       "status": 200,
@@ -285,7 +282,7 @@ All endpoints below are prefixed with `/api/chat` and require **JWT Bearer Token
       },
       "error": null
     }
-    \`\`\`
+    ```
 - **Error Codes**:
     - `400`: 유효성 검사 실패 (닉네임 길이 초과 등)
     - `409`: 닉네임 중복 발생 (`E_CONFLICT`)
@@ -392,14 +389,10 @@ All endpoints below are prefixed with `/api/chat` and require **JWT Bearer Token
 
 ## Friends API (`src/friend/friend.controller.ts`, 전체 `@UseGuards(JwtAuthGuard)`)
 
-> **정정 (2026-08-14)**: 예전 설계 메모는 "Auth merge 전 임시 처리로 `x-user-id` 헤더를 쓴다"고
-> 적어뒀지만, 실제 컨트롤러는 처음부터 다른 API들과 동일하게 `JwtAuthGuard` +
-> `@CurrentUser()` 데코레이터를 쓴다 — `x-user-id` 헤더 처리는 코드에 존재한 적이 없다.
+모든 Friends API는 `JwtAuthGuard`와 `@CurrentUser()` 데코레이터로 요청자를 인증한다.
 
 ### [POST] /api/friends/by-nickname/{nickname}
-- **Description**: 닉네임으로 친구 요청 생성. **설계 메모에 없던 엔드포인트** — 실제로는
-  유저 ID가 아니라 닉네임으로 찾아 요청하는 이 경로가 프론트(`LobbyPage.tsx` 친구 추가 UI)의
-  기본 진입점이다.
+- **Description**: 닉네임으로 친구 요청을 생성한다. 프론트의 친구 추가 UI가 사용하는 기본 진입점이다.
 - **Path Params**: `nickname`
 - **Auth**: JWT 필수(`@CurrentUser()`로 요청자 식별)
 
@@ -437,13 +430,11 @@ All endpoints below are prefixed with `/api/chat` and require **JWT Bearer Token
 - **Auth**: JWT 필수
 
 ### [GET] /api/friends/requests/sent
-- **Description**: 내가 보낸(아직 `PENDING`인) 친구 요청 목록. **설계 메모에 없던 엔드포인트** —
-  게임 중 중복 요청 방지 UI(`WaitingRoomPage.tsx`, `#92`)가 이 API로 대기 중 요청 여부를 미리
-  확인한다.
+- **Description**: 내가 보낸 `PENDING` 친구 요청 목록을 반환한다.
 - **Auth**: JWT 필수
 
 ### [GET] /api/friends/requests
-- **Description**: 내가 받은(아직 `PENDING`인) 친구 요청 목록. **설계 메모에 없던 엔드포인트**.
+- **Description**: 내가 받은 `PENDING` 친구 요청 목록을 반환한다.
 - **Auth**: JWT 필수
 
 ### [GET] /api/friends
