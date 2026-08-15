@@ -56,7 +56,7 @@
 | **Web** | User Interaction | Major | 2 | jahong | 채팅, 프로필, 친구 시스템 구현 |
 | **Web** | Use an ORM | Minor | 1 | jishin | TypeORM을 통한 효율적인 데이터 관리 |
 | **User Management** | Standard user management | Major | 2 | jishin | 프로필 수정, 아바타 업로드(기본 아바타 포함), 친구+온라인 상태 |
-| **User Management** | Game statistics & match history | Minor | 1 | jahong | 전적/승률/매치 히스토리, 리더보드 |
+| **User Management** | Game statistics & match history | Minor | 1 | yuhyoon | 전적/승률/매치 히스토리, 리더보드 |
 | **User Management** | Remote authentication (OAuth 2.0) | Minor | 1 | jishin | 42 intra OAuth 2.0 로그인 |
 | **AI** | AI Opponent | Major | 2 | kyouhele | `architecture_design/AI_OPPONENT_SPEC.md` 기준 인간형 AI 대전, 유저 성능 기반 개인화 |
 | **Gaming** | Web-based game | Major | 2 | yuhyoon | 실시간 웹 기반 산성비 타자 대전 |
