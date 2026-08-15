@@ -147,6 +147,33 @@ docker-compose up --build
 ```
 이후 `https://localhost`에서 서비스를 확인할 수 있습니다.
 
+### Local Port Override
+42클러스터 컴퓨터처럼 기본 포트가 막혀 있으면, base 파일은 그대로 두고 로컬 전용 override를 덮어씁니다.
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.local.yml up --build
+```
+
+기본값은 다음처럼 잡혀 있습니다.
+
+| Service | Local Port |
+| :--- | :--- |
+| Web App / HTTPS | `8443` |
+| Web App / HTTP | `8080` |
+| Frontend Direct | `8081` |
+| Backend Direct | `3000` |
+| PostgreSQL | `5432` |
+| Redis | `6380` |
+| Prometheus | `9090` |
+| node-exporter | `9101` |
+| Grafana | `3001` |
+
+필요하면 실행 시 환경변수로 바로 바꿀 수 있습니다.
+
+```bash
+HTTP_HOST_PORT=8082 HTTPS_HOST_PORT=8444 REDIS_HOST_PORT=6381 docker compose -f docker-compose.yml -f docker-compose.local.yml up --build
+```
+
 ### First-run Verification
 처음 실행하는 평가자는 아래 순서로 기본 동작을 확인할 수 있습니다.
 
