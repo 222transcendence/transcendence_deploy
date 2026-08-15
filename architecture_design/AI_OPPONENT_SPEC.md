@@ -1,7 +1,7 @@
 # 산성비 AI 대전 기능 명세서
 
 > 기준 브랜치: `transcendence_backend/dev`
-> 관련 문서: `architecture_design/GAME_DESIGN.md`, `architecture_design/WEBSOCKET_PROTOCOL.md`(§6.8 `ai_monitor_snapshot`), `USE_CASES.md`  
+> 관련 문서: `architecture_design/GAME_DESIGN.md`, `architecture_design/WEBSOCKET_PROTOCOL.md`(§6.8 `ai_monitor_snapshot`), `USE_CASES.md`
 > 담당 범위: AI Opponent Major 모듈 및 상시 AI 대전 사용자 흐름
 
 ---
