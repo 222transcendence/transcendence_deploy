@@ -41,7 +41,7 @@ erDiagram
         int finalHp
         int rank "1=우승, 공동순위 허용"
     }
-    %% N인(2~4) 매치의 참가자별 결과 — backend#91. DATABASE_DESIGN.md 참고.
+    %% N인(2~4) 매치의 참가자별 결과.
 
     WORD_ATTEMPT_RECORD {
         uuid id PK
@@ -86,7 +86,7 @@ erDiagram
         int keystrokes
         boolean isActive
     }
-    %% 단어 은행은 정적 배열이 아니라 실제 DB 테이블이다(backend#72) — 아래 §3 참고.
+    %% 단어 은행은 정적 배열이 아니라 실제 DB 테이블이다 — 아래 §3 참고.
 
     FRIENDSHIP {
         uuid id PK
@@ -96,7 +96,7 @@ erDiagram
         timestamp updatedAt
     }
     %% BLOCKED 상태는 없다 — 실제 enum(FriendStatus)은 PENDING/ACCEPTED 둘뿐이며, 거절은 별도
-    %% 상태 없이 PENDING row를 삭제하는 방식으로 처리한다(DATABASE_DESIGN.md 참고).
+    %% 상태 없이 PENDING row를 삭제하는 방식으로 처리한다.
 ```
 
 ## 2. Implementation Strategies

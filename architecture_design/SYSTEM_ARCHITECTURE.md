@@ -97,12 +97,14 @@ private readonly sessions = new Map<string, AcidRainSession>();
 - **현재 수평 확장 미지원** — 위 §3 참고. 백엔드를 여러 대로 늘리려면 최소한 Socket.IO Redis
   어댑터 + 게임 세션 상태의 Redis(또는 다른 공유 저장소) 이전이 선행돼야 한다.
 - **Redis/PostgreSQL 모두 단일 인스턴스** — Sentinel, Read Replica, 클러스터링 어느 것도
-  `docker-compose.yml`에 구성돼 있지 않다. Redis가 죽으면 재접속 복구(`state_sync`)와 로비
-  룸 상태가 즉시 영향을 받는다(인메모리 매치 자체는 살아있지만).
+  `docker-compose.yml`에 구성돼 있지 않다. Redis 장애는 로비 상태와 snapshot persistence에
+  영향을 준다. 다만 backend process가 살아 있고 `AcidRainService`의 in-memory session이
+  유지되는 동안 진행 중 게임의 `state_sync`는 메모리 세션에서 생성된다. backend process가
+  종료되어 메모리 세션이 사라진 경우에는 Redis snapshot만으로 자동 복구하지 않는다.
 - **체크포인팅 시스템(`game_checkpoints` 테이블, 액션 로그 재생)은 구현 범위에서 제외됐다** —
   실제 마이그레이션이나 코드에 해당 테이블/로직이 없다.
-- **Monitoring**: Prometheus + node-exporter + Grafana는 실제로 구성돼 있다(§1) —
-  이 부분은 이전 문서 서술과 일치한다. 백엔드는 `GET /metrics`(접두사 없음,
+- **Monitoring**: Prometheus + node-exporter + Grafana는 실제로 구성돼 있다(§1).
+  백엔드는 `GET /metrics`(접두사 없음,
   `API_SPECIFICATION.md` §3.1)로 커스텀 메트릭(활성 게임 수, 단어 판정 카운터 등)을 노출한다.
 
 ## 5. 컨테이너 간 인증/네트워크
