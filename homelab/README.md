@@ -14,15 +14,17 @@ record is needed.
 ## What's NOT here
 
 - No secret values — `.env` (read by the root `docker-compose.yml` via `${VAR}`
-  interpolation) and `homelab/prometheus.htpasswd` stay local and untracked.
+  interpolation) stays local and untracked.
 - No DNS/router config, no TLS certificates.
+- No auth in front of Prometheus/Grafana — Grafana has its own login; Prometheus's
+  `/prometheus/` path is open (deliberately, no Basic Auth).
 
 ## Files
 
 | File | Contains |
 |---|---|
-| `docker-compose.override.yml` | Rebinds host ports to `127.0.0.1` (except nginx), adds Grafana/Prometheus subpath config, mounts `nginx-homelab.conf` + htpasswd into the nginx container |
-| `nginx-homelab.conf` | Full nginx config (not a diff) — same routing as the root `nginx/nginx.conf` plus `/grafana/`, `/prometheus/` (Basic Auth) location blocks. Replaces the built-in config via a volume mount; the image's own `nginx/nginx.conf` is untouched |
+| `docker-compose.override.yml` | Rebinds host ports to `127.0.0.1` (except nginx), adds Grafana/Prometheus subpath config, mounts `nginx-homelab.conf` into the nginx container |
+| `nginx-homelab.conf` | Full nginx config (not a diff) — same routing as the root `nginx/nginx.conf` plus `/grafana/`, `/prometheus/` location blocks. Replaces the built-in config via a volume mount; the image's own `nginx/nginx.conf` is untouched |
 
 ## Usage
 
