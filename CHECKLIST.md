@@ -61,9 +61,9 @@
 | P4-01 | Browser console warning/error zero baseline | yuhyoon | Done | (프론트 전체) | 호스팅된 사이트에서 Chrome DevTools 콘솔 직접 확인(2026-08-15, yuhyoon) |  |
 | P4-02 | Privacy Policy and Terms of Service page reachable | jishin | Done | frontend/src/pages/PrivacyPolicyPage.tsx, TermsOfServicePage.tsx, components/Footer.tsx | 호스팅된 사이트에서 Footer 링크로 두 페이지 직접 접속 확인(2026-08-15, yuhyoon) | feat(legal): add PrivacyPolicy and TermsOfService pages with Footer component [#11] |
 | P4-03 | Multi-user concurrency check (>5 users) completed | yuhyoon | Done | game/acid-rain/acid-rain.service.ts (AcidRainSession.participants[], 2~4인 배틀로얄 + 다중 방 동시 운영) | 5인 이상 동시 접속 정상 동작 직접 확인(2026-08-15, yuhyoon) |  |
-| P4-04 | README module-to-owner and demo flow finalized | yuhyoon | In Progress | README.md (팀원 개별 기여, 기술스택 선택 이유, 모듈 선택 이유/담당자, 프로젝트 관리 방식 섹션 보강, 2026-08-15) | PDF 평가표 8개 필수 섹션 대조 완료 | (커밋 대기) |
+| P4-04 | README module-to-owner and demo flow finalized | yuhyoon | Done | README.md (팀원 개별 기여, 기술스택 선택 이유, 모듈 선택 이유/담당자, 프로젝트 관리 방식 섹션 보강, 2026-08-15) | PDF 평가표 8개 필수 섹션 대조 완료 | docs: 평가 체크리스트 최종 점검 및 README 필수 섹션 보강 [P4-04] (a09e191) |
 | P4-05 | AI_USAGE transparency and review log finalized | yuhyoon | Done | AI_USAGE.md (정책/도구/영역별 사용 로그/산출물/리뷰 체크리스트/결론 전부 기재) | 내용 완전성 직접 검토 완료(2026-08-15) | docs: update README.md and AI_USAGE.md with final module list |
-| P4-06 | Final demo script and fallback scenario rehearsed | yuhyoon | In Progress | (문서 없음) | 평가표(PDF) 기준 섹션별 구두 리허설 진행 중(2026-08-15, PO 개인 기여/모듈 13개 중 12개/재접속/OAuth/모니터링 완료) |  |
+| P4-06 | Final demo script and fallback scenario rehearsed | yuhyoon | Done | (문서 없음) | 평가표(PDF) 기준 구두 리허설 완료(2026-08-15) — PO 개인 기여/역할 설명, 모듈 13개 중 12개 시연 포인트, Git 히스토리 라이브 데모 명령어, 콘솔/Privacy·ToS/5인 동시접속/알림 스모크 테스트 확인 |  |
 
 ---
 
@@ -74,7 +74,7 @@
 | Phase 1 | 6 | 0 | 0 | 0 |
 | Phase 2 | 6 | 0 | 0 | 0 |
 | Phase 3 | 6 | 0 | 0 | 0 |
-| Phase 4 | 4 | 2 | 0 | 0 |
+| Phase 4 | 6 | 0 | 0 | 0 |
 
 ## PM Weekly Review Log
 
@@ -83,8 +83,8 @@
 | 2026-08-15 | yuhyoon (PO) | Phase 2-4 전체 | P4-03, P4-05 | P4-04(README 갱신 미커밋) | P4-03(5인 이상 동시접속 테스트 미실시), P2-05/P3-06(검증 증빙 부족) | 1) README 갱신 커밋 [P4-04] 2) AI_USAGE.md 최신화 확인 [P4-05] 3) 5인 동시접속 테스트 실행 [P4-03] |
 
 ## Final Completion Gate
-- [ ] 모든 체크리스트 ID가 Done 상태
-- [ ] 모든 Done 항목에 Commit(s) 존재
-- [ ] README, AI_USAGE 최신화
-- [ ] 데모 리허설 완료
-- [ ] 평가 기준(Function-First) 충족
+- [x] 모든 체크리스트 ID가 Done 상태 (24/24, 2026-08-15)
+- [ ] 모든 Done 항목에 Commit(s) 존재 — P4-01/P4-03/P4-06은 코드 변경이 아닌 라이브 검증 항목이라 연결된 커밋 없음(의도된 예외)
+- [x] README, AI_USAGE 최신화 (2026-08-15)
+- [x] 데모 리허설 완료 (2026-08-15)
+- [ ] 평가 기준(Function-First) 충족 — 팀 전체 최종 확인 필요
