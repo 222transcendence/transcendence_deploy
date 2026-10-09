@@ -3,7 +3,7 @@
 *This Transcendence project has been created as part of the 42 curriculum by hisong, jahong, jishin, kyouhele, yuhyoon.*
 
 ## 1. Description
-Demo : acidrain.hijae.dev
+Demo : https://acidrain.hijae.dev
 
 실시간 2인 타자 대전 게임 **산성비(Acid Rain)**입니다. 서버가 동일한 단어 스트림을
 양쪽 플레이어에게 동시에 브로드캐스트하면, 화면 위에서 단어가 떨어지고 먼저 정확히 입력한 플레이어가
