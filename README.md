@@ -1,9 +1,11 @@
-# Transcendence: 산성비 (Acid Rain) Real-time Typing Battle
+# 산성비 (Acid Rain) Real-time Typing Battle
 
-*This project has been created as part of the 42 curriculum by hisong, jahong, jishin, kyouhele, yuhyoon.*
+*This Transcendence project has been created as part of the 42 curriculum by hisong, jahong, jishin, kyouhele, yuhyoon.*
 
 ## 1. Description
-**Transcendence**는 실시간 2인 타자 대전 게임 **산성비(Acid Rain)**입니다. 서버가 동일한 단어 스트림을
+Demo : acidrain.hijae.dev
+
+실시간 2인 타자 대전 게임 **산성비(Acid Rain)**입니다. 서버가 동일한 단어 스트림을
 양쪽 플레이어에게 동시에 브로드캐스트하면, 화면 위에서 단어가 떨어지고 먼저 정확히 입력한 플레이어가
 그 단어를 지우며 상대에게 데미지를 줍니다. 아무도 지우지 못한 단어가 바닥에 닿으면 양쪽 모두 데미지를
 입습니다. 서버가 스폰 타이밍/순서와 판정을 전적으로 결정하는 권위 서버(authoritative server) 구조로,
@@ -33,7 +35,7 @@
 | **Developer** | jishin | 소셜 기능 백엔드 전담(친구 요청·수락·거절·온라인 상태, 채팅 API/Gateway); DB ORM 엔티티·마이그레이션 설계 |
 
 ### 개별 기여 내역 (Individual Contributions)
-> Git 커밋 이력(작성자 이메일 기준)을 근거로 작성했습니다. 세부 항목은 각 팀원 확인 후 갱신 예정입니다.
+> Git 커밋 이력을 근거로 작성했습니다.
 
 | 로그인 | 주요 기여 |
 | :--- | :--- |
